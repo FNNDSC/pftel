@@ -1,0 +1,12 @@
+psutil~=5.8.0
+pfstate~=3.0.2
+pudb
+webob
+pynetdicom
+pypx>=3.10.12
+
+# Database
+motor
+dnspython
+
+loguru

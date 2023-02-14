@@ -1,0 +1,3 @@
+`pftel` is a simple fastAPI telemetry logger. Clients POST a text payload to an API endpoint, which `pftel` will simply log to a file, in a variety of possible formats.
+
+API documentation is available at :22223/docs
