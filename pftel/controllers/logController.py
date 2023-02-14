@@ -14,7 +14,7 @@ from    typing              import  Optional, List, Dict
 from    .jobController      import  jobber
 import  asyncio
 import  subprocess
-from    models              import  pacsQRmodel, logModel
+from    models              import  logModel
 import  logging
 # from    pflogf              import  FnndscLogFormatter
 import  os
@@ -71,11 +71,53 @@ async def save(
     Args:
         payload (logModel.logStructured): the load payload
     """
+    str_containerDir:str= '%s/%s/%s'% (config.dbAPI.dobj_DB.DB, payload.logObject, payload.logName)
+    str_logThis:str     = '%s'      % payload.appName
+    str_container:str   = '%s/%s'   % (str_containerDir, str_logThis)
 
+    list_logObjects         = lambda    : config.dbAPI.telemetryService_listObjs()
+    logContainerDir_exists  = lambda    : config.dbAPI.DB.exists(
+                                              str_logThis, path = str_containerDir)
+    logContainerDir_create  = lambda    : config.dbAPI.DB.mkdir(str_containerDir)
+    logContainer_load       = lambda    : config.dbAPI.DB.cat(str_container)
+    logContainer_write      = lambda x  : config.dbAPI.DB.touch(str_container, x)
+    logContainer_commit     = lambda    : config.dbAPI.DB.node_save('',
+                                            startPath       = str_containerDir,
+                                            pathDiskRoot    = '%s' % (
+                                                config.dbAPI.str_FSprefix,
+                                            ),
+                                            failOnDirExist  = False
+                                    )
 
+    pudb.set_trace()
 
-    LOG("hello, there!")
+    d_logThis       : dict  = {
+        'execTime'  : payload.execTime,
+        'extra'     : payload.extra
+    }
+    d_existingLog   : dict  = {}
+    if payload.logObject in list_logObjects():
+        if not logContainerDir_exists():
+            logContainerDir_create()
+        d_existingLog.update(d_logThis)
+        logContainer_write(d_existingLog)
+        logContainer_commit()
+
+    LOG("Saved log ")
     return None
+
+def internalObjects_getList() -> list:
+    """
+    Return a list of internal object names
+    """
+    return list(config.dbAPI.telemetryService_listObjs())
+
+def internalObject_get(objName : str) -> dict:
+    """
+    Return a dictionary representation of a single PACS object
+    """
+    return dict(config.dbAPI.telemetryService_info(objName))
+
 
 # async def thread_pypxDo_async(PACSobjName, listenerObjName, queryTerms):
 #     task    = asyncio.create_task(pypx_do(PACSobjName, listenerObjName, queryTerms))
