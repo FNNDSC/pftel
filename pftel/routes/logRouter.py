@@ -15,9 +15,6 @@ from    fastapi             import  APIRouter, Query, HTTPException, BackgroundT
 from    fastapi.encoders    import  jsonable_encoder
 from    typing              import  List, Dict
 
-from    models              import  pacsQRmodel
-from    controllers         import  pacsQRcontroller
-
 from    models              import  logModel
 from    controllers         import  logController
 
@@ -44,7 +41,7 @@ async def log_write(
 
     The specific details of _how_ this resource exists is less relevant
     to the client -- it could be a file/database/etc. In order to "read"
-    previous telemetry logs, perform a GET request. 
+    previous telemetry logs, perform a GET request.
 
     Args:
         logPayload (logModel.log): the log object to record
@@ -56,3 +53,28 @@ async def log_write(
     d_write = await logController.save(logPayload)
     return d_write
 
+@router.get(
+    "/log/list/",
+    response_model  = List,
+    summary         = "GET the list of configured log element objects"
+)
+async def logList_get():
+    """
+    GET the list of configured log element objects
+    """
+    # pudb.set_trace()
+    return logController.internalObjects_getList()
+
+@router.get(
+    "/log/{logName}/",
+    response_model  = logModel.logReturnModel,
+    summary         = "GET the information for a given PACS"
+)
+async def logObject_get(
+    logName: str
+):
+    """
+    GET the setup info pertinent to a log object element called`logName`
+    """
+    pudb.set_trace()
+    return logController.internalObject_get(logName)
