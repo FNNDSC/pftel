@@ -9,17 +9,17 @@ from    typing              import Optional, List, Dict
 from    datetime            import datetime
 
 from    pathlib             import Path
-from    db                  import pfdb
 import  pudb
 
 
 class logCore(BaseModel):
     """Model for the core log info saved to DB"""
-    url                                 : str = ""
-    username                            : str = ""
-    password                            : str = ""
-    dbDir                               : str = ""
-    telemetryDir                        : str = ""
+    url                                 : str = "http://localhost:2223"
+    username                            : str = "any"
+    password                            : str = "any"
+    dbDir                               : str = "/home/dicom"
+    telemetryDir                        : str = "telemetry"
+    description                         : str = "Add a description!"
 
 class logFile(BaseModel):
     """Model for the log file"""
@@ -34,22 +34,27 @@ class logSimple(BaseModel):
 class logStructured(BaseModel):
     """A simple structured log model"""
     logObject                           : str   = "default"
-    logName                             : str   = ""
+    logCollection                       : str   = ""
+    logEvent                            : str   = ""
     appName                             : str   = ""
     execTime                            : float = 0.0
     extra                               : str   = ""
 
+class logBoolReturn(BaseModel):
+    status                              : bool  = False
+
 class logResponse(BaseModel):
     """A model returned a log is POSTed"""
     response                            : dict
-    echo                                : str
+    status                              : bool
     timestamp                           : str
+    message                             : str
 
 class time(BaseModel):
     """A simple model that has a time string field"""
     time            : str
 
-class logReturnModel(BaseModel):
+class logInit(BaseModel):
     """
     A full model that is returned from a query call
     """
