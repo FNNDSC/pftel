@@ -9,14 +9,13 @@ from    fastapi             import  APIRouter, Query
 from    fastapi.encoders    import  jsonable_encoder
 from    fastapi.concurrency import  run_in_threadpool
 from    pydantic            import  BaseModel, Field
-from    typing              import  Optional, List, Dict
+from    typing              import  Optional, List, Dict, Callable, Any
 
 from    .jobController      import  jobber
 import  asyncio
 import  subprocess
 from    models              import  logModel
 import  logging
-# from    pflogf              import  FnndscLogFormatter
 import  os
 from    datetime            import  datetime
 
@@ -61,9 +60,9 @@ def noop():
         'status':   True
     }
 
-async def save(
+def save(
         payload             : logModel.logStructured
-):
+) -> dict:
     """
     Parse the incoming payload, and write appropriate
     information to some storage resource.
@@ -71,8 +70,10 @@ async def save(
     Args:
         payload (logModel.logStructured): the load payload
     """
-    str_containerDir:str= '%s/%s/%s'% (config.dbAPI.dobj_DB.DB, payload.logObject, payload.logName)
-    str_logThis:str     = '%s'      % payload.appName
+    b_saved:bool        = False
+    message:str         = "Nothing was saved -- logObject probably doesn't exist"
+    str_containerDir:str= '%s/%s/%s'% (config.dbAPI.dobj_DB.DB, payload.logObject, payload.logCollection)
+    str_logThis:str     = '%s'      % payload.logEvent
     str_container:str   = '%s/%s'   % (str_containerDir, str_logThis)
 
     list_logObjects         = lambda    : config.dbAPI.telemetryService_listObjs()
@@ -89,9 +90,8 @@ async def save(
                                             failOnDirExist  = False
                                     )
 
-    pudb.set_trace()
-
     d_logThis       : dict  = {
+        'appName'   : payload.appName,
         'execTime'  : payload.execTime,
         'extra'     : payload.extra
     }
@@ -102,9 +102,31 @@ async def save(
         d_existingLog.update(d_logThis)
         logContainer_write(d_existingLog)
         logContainer_commit()
+        b_saved = True
+        message = f"Saved log {str_container}"
+    LOG(message)
+    return {
+        'response':     d_logThis,
+        'status':       b_saved,
+        'timestamp':    '%s' % datetime.now(),
+        'message':      message
+    }
 
-    LOG("Saved log ")
-    return None
+def internalObject_initOrUpdate(
+        logObj:str,
+        d_data:logModel.logCore
+) -> logModel.logInit:
+    """Create a new (or made updates to a) log object.
+
+    Args:
+        logObj (str): Log Object to create or update
+
+    Returns:
+        logModel.logResponse: create/update response
+    """
+    return config.dbAPI.telemetryService_initObj(
+        logObj, d_data
+    )
 
 def internalObjects_getList() -> list:
     """
@@ -112,171 +134,76 @@ def internalObjects_getList() -> list:
     """
     return list(config.dbAPI.telemetryService_listObjs())
 
-def internalObject_get(objName : str) -> dict:
+def internalObject_getInfo(
+            objName:str
+) -> dict:
     """
     Return a dictionary representation of a single PACS object
     """
     return dict(config.dbAPI.telemetryService_info(objName))
 
+def internalObject_getCollections(
+            objName:str
+) -> list:
+    """
+    Return a list representation of all the "collections" that
+    exist for this object. A "collection" is a named grouping
+    that houses all the logs from applications that together
+    constitute some logical group -- for example all the apps
+    is a given ChRIS feed could constitute one collection.
+    """
+    return config.dbAPI.telemetryService_collectionList(
+        objName
+    )
 
-# async def thread_pypxDo_async(PACSobjName, listenerObjName, queryTerms):
-#     task    = asyncio.create_task(pypx_do(PACSobjName, listenerObjName, queryTerms))
-#     await task
+def internalObjectCollection_get(
+            objName:str,
+            collectionName:str
+) -> list:
+    """
+    Return a list representation of all the "events" details
+    for this collection.
+    """
+    return config.dbAPI.telemetryService_collectionGet(
+        objName, collectionName
+    )
 
-# def thread_pypxDo(PACSobjName, listenerObjName, queryTerms):
-#     asyncio.run(thread_pypxDo_async(PACSobjName, listenerObjName, queryTerms))
+def internalObjectCollection_getCSV(
+            objName:str,
+            collectionName:str
+) -> str:
+    """
+    Return a list representation of all the "events" details
+    for this collection.
+    """
+    return config.dbAPI.telemetryService_collectionGetCSV(
+        objName, collectionName
+    )
 
-# async def pypx_threadedDo(
-#         PACSobjName             : str,
-#         listenerObjName         : str,
-#         queryTerms              : pacsQRmodel.PACSqueryCore,
-# ) -> Future:
-#     """asynchronous wrapper around pypx_do that runs the method using concurrent.futures
+def internalObjectCollection_getEvents(
+            objName:str,
+            collectionName:str
+) -> list:
+    """
+    Return a list representation of all the "events" thatubuntu ping package
+    exist for this collection. An "event" is the atomic element
+    in the logger universe, and is the actual telemetry data
+    transmitted by an application, for instance an application
+    in a given ChRIS feed.
+    """
+    return config.dbAPI.telemetryService_eventList(
+        objName, collectionName
+    )
 
-#     Args:
-#         PACSobjName (str): the PACS object to use
-#         listenerObjName (str): the listener subsystem associated with the PACS object
-#         queryTerms (pacsQRmodel.PACSqueryCore): the query JSON object dispatched to pypx
-
-#     Returns:
-#         dict: simple dictionary reflecting the async call.
-#     """
-#     loop = asyncio.get_running_loop()
-#     future = loop.run_in_executor(threadpool, thread_pypxDo, PACSobjName, listenerObjName, queryTerms)
-#     return future
-
-# async def pypx_multiprocessDo(
-#         PACSobjName             : str,
-#         listenerObjName         : str,
-#         queryTerms              : pacsQRmodel.PACSqueryCore,
-#         action                  : str   = "query"
-# ) -> dict:
-#     """
-#     This method calls a CLI equivalent of the px-find module.
-#     """
-
-#     def pxfindArgs_prune(d_args):
-#         """
-#         Prune dictionary args that do not map to px-find CLI
-#         """
-#         for tag in [
-#             'PatientBirthDate',
-#             'PatientAge',
-#             'NumberOfSeriesRelatedInstances',
-#             'InstanceNumber',
-#             'SeriesDate',
-#             'json_response'
-#             ]:
-#             try:
-#                 del d_args[tag]
-#             except:
-#                 pass
-
-#     def args_prune():
-#         """Prune args -- removes any args not relevant to the CLI px-find
-#         """
-#         # global d_queryTerms, d_service
-#         # this following is an impedence matching hack!
-#         # replace the `dblogbasepath` with `db` for the CLI call
-#         d_queryTerms['db']              = d_queryTerms['dblogbasepath']
-#         del d_queryTerms['dblogbasepath']
-#         pxfindArgs_prune(d_queryTerms)
-#         try:
-#             del d_service['aet_listener']
-#         except:
-#             pass
-
-#     def shell_exec(d_JSONargs: dict) -> dict:
-#         """Run the specific PACS operation from a CLI call
-
-#         Args:
-#             d_JSONargs (dict): JSON representation of the CLI
-
-#         Returns:
-#             dict: response from CLI (stdout, stderr, returncode)
-#         """
-#         # global d_response
-#         try:
-#             shell                       = jobber({'verbosity' : 1, 'noJobLogging': True})
-#             str_cliArgs                 = shell.dict2cli(d_JSONargs)
-#             # str_JSONargs                = shell.dict2JSONcli(d_JSONargs)
-#             str_pxfindexec              = 'px-find %s' % str_cliArgs
-#             d_response['exec']          = shell.job_runbg(str_pxfindexec)
-#             # d_response['exec']          = shell.job_run(str_pxfindexec)
-#             d_response['status']        = True
-#             d_response['message']       = 'CLI px-find spawned'
-#         except Exception as e:
-#             d_response['error']         = '%s' % e
-#         return d_response
-
-#     d_response  : dict  = {
-#         'status'    :   False,
-#         'message'   :   "No %s performed" % action,
-#         'exec'      :   {}
-#     }
-#     d_JSONargs      : dict  = {}
-#     str_JSONargs    : str   = ""
-#     str_pxfindexec  : str   = ""
-#     d_service       : dict  = {}
-#     d_queryTerms    : dict  = jsonable_encoder(queryTerms)
-#     d_queryTerms['json']    = d_queryTerms['json_response']
-#     if PACSobjName in config.dbAPI.PACSservice_listObjs():
-#         if listenerObjName in config.dbAPI.listenerService_listObjs():
-#             d_PACSservice   : dict          = config.dbAPI.PACSservice_info(
-#                                                 PACSobjName
-#                                             )
-#             d_service                       = d_PACSservice['info']
-#             args_prune()
-#             d_JSONargs                      = {**d_service, **d_queryTerms}
-#             d_response                      = shell_exec(d_JSONargs)
-#         else:
-#             d_response['message']       = \
-#                 "'%s' is not a configured listener service" % listenerObjName
-#     else:
-#         d_response['message']   = \
-#                 "'%s' is not a configured PACS service" % PACSobjName
-#     # with open('/home/dicom/tmp/resp.json', 'a') as db:
-#     #     json.dump(d_response, db)
-#     return d_response
-
-# async def pypx_do(
-#         PACSobjName             : str,
-#         listenerObjName         : str,
-#         queryTerms              : pacsQRmodel.PACSqueryCore,
-#         action                  : str   = "query"
-# ) -> dict:
-#     """
-#     Main dispatching method for interacting with pypx to effect some behaviour.
-
-#     All calls happen with a px-find, with behaviour specified in the `then`
-#     """
-#     d_response  : dict  = {
-#         'status'        :   False,
-#         'find'          :   {},
-#         'message'       :   "No %s performed" % action,
-#         'PACSdirective' :   queryTerms
-#     }
-#     d_service       : dict  = {}
-#     d_queryTerms    : dict  = jsonable_encoder(queryTerms)
-#     d_queryTerms['json']    = d_queryTerms['json_response']
-#     if PACSobjName in config.dbAPI.PACSservice_listObjs():
-#         if listenerObjName in config.dbAPI.listenerService_listObjs():
-#             d_PACSservice   : dict          = config.dbAPI.PACSservice_info(
-#                                                 PACSobjName
-#                                             )
-#             d_service                       = d_PACSservice['info']
-#             d_response['pypx']              = await pypx.find({**d_service, **d_queryTerms})
-#             if d_response['pypx']['status'] == 'success':
-#                 d_response['status']        = True
-#                 d_response['message']       = "pypx.then = '%s' was executed successfully" % \
-#                                                 d_queryTerms['then']
-#         else:
-#             d_response['message']       = \
-#                 "'%s' is not a configured listener service" % listenerObjName
-#     else:
-#         d_response['message']   = \
-#                 "'%s' is not a configured PACS service" % PACSobjName
-#     # with open('/home/dicom/tmp/resp.json', 'a') as db:
-#     #     json.dump(d_response, db)
-#     return d_response
-
+def internalObjectCollection_getEvent(
+            objName:str,
+            collectionName:str,
+            eventName:str
+) -> dict:
+    """
+    Return the "raw" (JSON) telemetry data that was transmitted
+    by an event.
+    """
+    return config.dbAPI.telemetryService_event(
+        objName, collectionName, eventName
+    )
