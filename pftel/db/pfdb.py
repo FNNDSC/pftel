@@ -1,13 +1,12 @@
-from    pydantic            import BaseModel, Field
-# from    models              import pacsSetupModel
+from    pydantic        import BaseModel, Field
 
 import  json
-from    datetime    import datetime
+from    datetime        import datetime
 
-import  pfstate
-from    pfstate     import  S
-
-from    pfmisc      import C_snode
+from    pfstate         import  S
+from    pfmisc.C_snode  import C_stree
+import  config
+import  sys
 
 import  pudb
 
@@ -101,38 +100,11 @@ class PFdb():
         'username':         'telemetry',
         'password':         'telemetry1234',
         'dbDir':            '/home/dicom',
-        'telemetryDir':     'telemetry'
+        'telemetryDir':     'telemetry',
+        'description':      'A telemetry object used to group together collections and events'
     }
 
     str_FSprefix    : str   = "%s/%s" % (d_telemetryCore['dbDir'], 'telemetry')
-
-    def __init__(self, *args, **kwargs) -> None:
-        """
-        Constructor -- creates default data structures.
-        """
-        self.str_loginName  = ''
-        self.str_passwd     = ''
-        pudb.set_trace()
-        for k,v in kwargs.items():
-            if k == 'login' :   self.str_loginName  = v
-            if k == 'passwd':   self.str_passwd     = v
-
-        # Create the basic DB
-        PFdb.dobj_DB    = DBstate(*args, **dict(kwargs, useGlobalState = True))
-        self.DB         = PFdb.dobj_DB.T
-
-        # Now add the default telemetry details
-        self.DB.touch(
-            '%s/default/info' % DBstate.DB, PFdb.d_telemetryCore
-        )
-        T_onDisk        = C_snode.C_stree.tree_load(pathDiskRoot = self.str_FSprefix)
-        d_T:dict        = {}
-        d_T.update(next(T_onDisk.__iter__(node = '/')))
-        self.DB.tree_save(startPath = '/', pathDiskRoot = self.str_FSprefix)
-        PFdb.dobj_DB.T.initFromDict(d_T)
-
-    def telemetryService_listObjs(self)-> list:
-        return list(self.DB.lstr_lsnode(DBstate.DB))
 
     def telemetryService_initObj(self,
             str_objName : str,
@@ -143,8 +115,8 @@ class PFdb():
         """
         str_message     : str   = ""
         if str_objName not in self.telemetryService_listObjs():
-            PFdb.dobj_DB.T.mkdir('%s/%s'   % (DBstate.DB, str_objName))
-            PFdb.dobj_DB.T.touch(
+            self.DB.mkdir('%s/%s'   % (DBstate.DB, str_objName))
+            self.DB.touch(
                     '%s/%s/json_created'   % (DBstate.DB, str_objName),
                     json.dumps({'time' : '%s' % datetime.now()})
             )
@@ -152,10 +124,15 @@ class PFdb():
         else:
             str_message     = "Existing object '%s' modified" % str_objName
 
-        PFdb.dobj_DB.T.touch('%s/%s/info' % (DBstate.DB, str_objName), d_data)
-        PFdb.dobj_DB.T.touch(
+        self.DB.touch('%s/%s/info' % (DBstate.DB, str_objName), dict(d_data))
+        self.DB.touch(
                 '%s/%s/json_modified'     % (DBstate.DB, str_objName),
                 json.dumps({'time' : '%s' % datetime.now()})
+        )
+        self.DB.node_save('',
+                        startPath       = '%s/%s' % (DBstate.DB, str_objName),
+                        pathDiskRoot    = self.str_FSprefix,
+                        failOnDirExist  = False
         )
         return {
             'info'          : self.DB.cat(
@@ -169,6 +146,58 @@ class PFdb():
                             ),
             'message'       : str_message
         }
+
+
+    def __init__(self, *args, **kwargs) -> None:
+        """
+        Constructor -- creates default data structures.
+
+        Two "construction" possibilities exist:
+
+        1. The _de novo_ mode, when this is the first time any telemetry is
+        being managed. No other telemetry prior telemetry exists. In this case
+        build an initial (mostly empty) DB, commit that, and continue.
+
+        2. We are being constructed in an environment where previous telemetry
+        exists. Perhaps a previous server crashed? Or a second telementry service
+        is created on the same DB? Regardless, if previous artifacts are found,
+        read from that DB into active memory.
+
+        Note it is probably possible for multi-process/threading to collide, but
+        the DB in external storage _should_ be ok with this.
+        """
+        self.str_loginName  = ''
+        self.str_passwd     = ''
+        # pudb.set_trace()
+        for k,v in kwargs.items():
+            if k == 'login' :   self.str_loginName  = v
+            if k == 'passwd':   self.str_passwd     = v
+
+        # Create the basic DB, mostly empty very first DB from the state object.
+        PFdb.dobj_DB:DBstate        = DBstate(*args, **dict(kwargs, useGlobalState = True))
+        # NB!!!! self.DB is separate from PFdb.dobj.DB.T!!!!
+        self.DB:C_stree             = PFdb.dobj_DB.T
+
+        self.telemetryService_initObj("default", PFdb.d_telemetryCore)
+        # # Now add the default telemetry details
+        # self.DB.touch(
+        #     '%s/default/info' % DBstate.DB, PFdb.d_telemetryCore
+        # )
+
+        # With an instantiated DB, let's see if there isn't one already on storage
+        # from some prior telemetry server.
+        T_onDisk:C_stree            = C_stree.tree_load(pathDiskRoot = self.str_FSprefix)
+        # If the size of this object is '48', then it is an empty tree and we save
+        # our initial state out to storage and move on. Otherwise, we shift to using
+        # this already-there DB.
+
+        if len( '%s' % T_onDisk) < 10:
+            self.DB.tree_save(startPath = '/', pathDiskRoot = self.str_FSprefix)
+        else:
+            self.DB                     = T_onDisk
+
+    def telemetryService_listObjs(self)-> list:
+        return list(self.DB.lstr_lsnode(DBstate.DB))
 
     def telemetryService_info(self, str_objName) -> dict:
         """
@@ -189,181 +218,69 @@ class PFdb():
                 'message'       : "Service information for '%s'"        % str_objName
             }
 
-    def PACSservice_listObjs(self) -> list:
+    def telemetryService_collectionList(self, str_objName) -> list:
         """
-        Return a list of the internal PACS services available.
+        Return a list of "collections" for the passed log object
         """
-        return list(PFdb.dobj_DB.T.lstr_lsnode('/DB/PACSservice'))
+        l_ret:list  = []
+        if str_objName in self.telemetryService_listObjs():
+            l_ret = list(self.DB.lstr_lsnode('%s/%s' % (DBstate.DB, str_objName)))
+        return l_ret
 
-    def listenerService_listObjs(self) -> list:
+    def telemetryService_eventList(self, str_objName, str_collectionName) -> list:
         """
-        Return a list of the internal listener services available.
+        Return a list of "events" for the passed obj/collection
         """
-        return list(PFdb.dobj_DB.T.lstr_lsnode('/DB/listenerService'))
+        l_ret:list  = []
+        if str_collectionName in self.telemetryService_collectionList(str_objName):
+            l_ret = list(self.DB.lsf('%s/%s/%s' % (DBstate.DB, str_objName, str_collectionName)))
+        return l_ret
 
-    def PACSservice_initObj(self,
-            str_objName : str,
-            d_data      : dict) -> dict:
+    def telemetryService_event(self,
+                str_objName,
+                str_collectionName,
+                str_eventName) -> dict:
         """
-        Add (or update) information about a new (or existing) PACS server
-        to the service.
+        Return a dictionary of the requested event for the passed
+        obj/collection/event
         """
-        str_message     : str   = ""
-        if str_objName not in self.PACSservice_listObjs():
-            PFdb.dobj_DB.T.mkdir('/DB/PACSservice/%s'   % str_objName)
-            PFdb.dobj_DB.T.touch(
-                    '/DB/PACSservice/%s/json_created'   % str_objName,
-                    json.dumps({'time' : '%s' % datetime.now()})
-            )
-            str_message     = "New object '%s' created" % str_objName
-        else:
-            str_message     = "Existing object '%s' modified" % str_objName
-
-        PFdb.dobj_DB.T.touch('/DB/PACSservice/%s/info' % str_objName, d_data)
-        PFdb.dobj_DB.T.touch(
-                '/DB/PACSservice/%s/json_modified'      % str_objName,
-                json.dumps({'time' : '%s' % datetime.now()})
-        )
-        return {
-            'info'          : PFdb.dobj_DB.T.cat(
-                                '/DB/PACSservice/%s/info'           % str_objName
-                            ),
-            'time_created'  : json.loads(PFdb.dobj_DB.T.cat(
-                                '/DB/PACSservice/%s/json_created'   % str_objName)
-                            ),
-            'time_modified' : json.loads(PFdb.dobj_DB.T.cat(
-                                '/DB/PACSservice/%s/json_modified'  % str_objName)
-                            ),
-            'message'       : str_message
-        }
-
-    def listenerService_initObjComponent(self,
-            str_objName     : str,
-            str_component   : str,
-            d_data          : dict) -> dict:
-        """
-        Add (or update) xinetd information about a new (or existing) listener service
-        """
-        str_message     : str   = ""
-        d_dataDef       : dict  = {}
-        if str_objName not in self.listenerService_listObjs():
-            for str_part in ['xinetd', 'dcmtk']:
-                if str_part == 'xinetd':
-                    d_dataDef   = PFdb.d_xinetdCore
-                else:
-                    d_dataDef   = PFdb.d_dcmtkCore
-                PFdb.dobj_DB.T.mkdir('/DB/listenerService/%s/%s'            % \
-                                    (str_objName, str_part))
-                for str_file in ['json_created', 'json_modified']:
-                    PFdb.dobj_DB.T.touch(
-                            '/DB/listenerService/%s/%s/%s'                  % \
-                            (str_objName, str_part, str_file),
-                            json.dumps({'time' : '%s' % datetime.now()})
-                    )
-                PFdb.dobj_DB.T.touch('/DB/listenerService/%s/%s/info'       % \
-                            (str_objName, str_part), d_dataDef)
-                str_message     = "New %s data for '%s' created"            % \
-                                    (str_component, str_objName)
-        else:
-            str_message     = "Existing %s data for '%s' modified"          % \
-                                (str_component, str_objName)
-
-        PFdb.dobj_DB.T.touch('/DB/listenerService/%s/%s/info'               % \
-                            (str_objName, str_component), d_data)
-        PFdb.dobj_DB.T.touch(
-                '/DB/listenerService/%s/%s/json_modified'                   % \
-                (str_objName, str_component),
-                json.dumps({'time' : '%s' % datetime.now()})
-        )
-        return {
-            'info'          : PFdb.dobj_DB.T.cat(
-                                '/DB/listenerService/%s/%s/info'            % \
-                                (str_objName, str_component)
-                            ),
-            'time_created'  : json.loads(PFdb.dobj_DB.T.cat(
-                                '/DB/listenerService/%s/%s/json_created'    % \
-                                (str_objName, str_component))
-                            ),
-            'time_modified' : json.loads(PFdb.dobj_DB.T.cat(
-                                '/DB/listenerService/%s/%s/json_modified'  % \
-                                (str_objName, str_component))
-                            ),
-            'message'       : str_message
-        }
-
-    def PACSservice_portUpdate(self, str_objName : str, str_newPort : str):
-        """
-        Modify the port of a given PACS server object. The object is assumed
-        to exist.
-        """
-        d_info      :   dict = {}
-        d_ret       :   dict = {
-            'info'          : PFdb.d_PACSserverCoreError,
-            'time_created'  : {'time'   : 'not applicable'},
-            'time_modified' : {'time'   : 'not applicable'},
-            'message'       : "Specified object to modify was not found!"
-        }
-        if str_objName in self.PACSservice_listObjs():
-            d_info  = PFdb.dobj_DB.T.cat(
-                                    '/DB/PACSservice/%s/info'           % str_objName
-                )
-            d_info['server_port']   = str_newPort
-            d_ret   = self.PACSservice_initObj(str_objName, d_info)
+        d_ret:dict  = {}
+        if str_eventName in self.telemetryService_eventList(str_objName, str_collectionName):
+            d_ret = self.DB.cat('%s/%s/%s/%s' % (DBstate.DB, str_objName, str_collectionName, str_eventName))
         return d_ret
 
-    def PACSservice_info(self, str_objName) -> dict:
+    def telemetryService_collectionGet(self,
+                str_objName,
+                str_collectionName) -> list:
         """
-        Return a model conforming representation of a given
-        PACS server object
+        Return a list of "event" data for the passed obj/collection
         """
-        if str_objName in self.PACSservice_listObjs():
-            return {
-                'info'          : PFdb.dobj_DB.T.cat(
-                                    '/DB/PACSservice/%s/info'           % str_objName
-                                ),
-                'time_created'  : json.loads(PFdb.dobj_DB.T.cat(
-                                    '/DB/PACSservice/%s/json_created'   % str_objName)
-                                ),
-                'time_modified' : json.loads(PFdb.dobj_DB.T.cat(
-                                    '/DB/PACSservice/%s/json_modified'  % str_objName)
-                                ),
-                'message'       : "Service information for '%s'"        % str_objName
-            }
+        l_ret:list  = [
+            self.telemetryService_event(
+                str_objName, str_collectionName, x
+            ) for x in self.telemetryService_eventList(
+                            str_objName, str_collectionName
+                        )
+        ]
+        return l_ret
 
-    def listenerService_treeGet(self, str_objName):
-        if str_objName in self.listenerService_listObjs():
-            return PFdb.dobj_DB
-
-
-    def listenerService_info(self, str_objName) -> dict:
+    def telemetryService_collectionGetCSV(self,
+                str_objName,
+                str_collectionName) -> str:
         """
-        Return a model conforming representation of a given
-        listen service object
+        Return a list of "event" data for the passed obj/collection
         """
-        if str_objName in self.listenerService_listObjs():
-            return {
-                'xinetd'        : {
-                    'info'          : PFdb.dobj_DB.T.cat(
-                            '/DB/listenerService/%s/xinetd/info'                % str_objName
-                                    ),
-                    'time_created'  : json.loads(PFdb.dobj_DB.T.cat(
-                            '/DB/listenerService/%s/xinetd/json_created'        % str_objName)
-                                    ),
-                    'time_modified' : json.loads(PFdb.dobj_DB.T.cat(
-                            '/DB/listenerService/%s/xinetd/json_modified'       % str_objName)
-                                    ),
-                    'message'       : "xinetd service information for '%s'"     % str_objName
-                },
-                'dcmtk'         : {
-                    'info'          : PFdb.dobj_DB.T.cat(
-                            '/DB/listenerService/%s/dcmtk/info'                 % str_objName
-                                    ),
-                    'time_created'  : json.loads(PFdb.dobj_DB.T.cat(
-                            '/DB/listenerService/%s/dcmtk/json_created'         % str_objName)
-                                    ),
-                    'time_modified' : json.loads(PFdb.dobj_DB.T.cat(
-                            '/DB/listenerService/%s/dcmtk/json_modified'        % str_objName)
-                                    ),
-                    'message'       : "dcmtk information for '%s'"              % str_objName
-                },
-            }
+        str_CSV:str     = ""
+        l_events:list   = [
+            self.telemetryService_event(
+                str_objName, str_collectionName, x
+            ) for x in self.telemetryService_eventList(
+                            str_objName, str_collectionName
+                        )
+        ]
+        if len(l_events):
+            str_CSV = ','.join(l_events[0].keys()) + '\n'
+            for el in l_events:
+                str_CSV += ','.join(str(x) for x in el.values())
+                str_CSV += '\n'
+        return str_CSV
