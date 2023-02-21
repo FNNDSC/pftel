@@ -45,7 +45,7 @@ class logBoolReturn(BaseModel):
 
 class logResponse(BaseModel):
     """A model returned a log is POSTed"""
-    response                            : dict
+    log                                 : dict
     status                              : bool
     timestamp                           : str
     message                             : str
