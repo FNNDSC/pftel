@@ -246,7 +246,9 @@ class PFdb():
         """
         d_ret:dict  = {}
         if str_eventName in self.telemetryService_eventList(str_objName, str_collectionName):
-            d_ret = self.DB.cat('%s/%s/%s/%s' % (DBstate.DB, str_objName, str_collectionName, str_eventName))
+            d_ret = self.DB.cat('%s/%s/%s/%s' % (
+                DBstate.DB, str_objName, str_collectionName, str_eventName)
+            )
         return d_ret
 
     def telemetryService_collectionGet(self,
@@ -264,11 +266,26 @@ class PFdb():
         ]
         return l_ret
 
+    def telemetryService_dictAsCSV(self,
+                d_event:dict)-> str:
+        """Convert a dictionary into a CSV string
+
+        Args:
+            d_event (dict): an arbitrary dictionary
+
+        Returns:
+            str: a CSV formatted string representation of the dictionary values
+        """
+        str_CSV:str     = ""
+        str_CSV += ','.join(str(x) for x in d_event.values())
+        str_CSV += '\n'
+        return str_CSV
+
     def telemetryService_collectionGetCSV(self,
                 str_objName,
                 str_collectionName) -> str:
         """
-        Return a list of "event" data for the passed obj/collection
+        Return a CSV formatted string of "event" data for the passed obj/collection
         """
         str_CSV:str     = ""
         l_events:list   = [
