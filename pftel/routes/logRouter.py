@@ -65,6 +65,7 @@ async def log_write(
     previous telemetry logs, perform a GET request.
 
     """
+    pudb.set_trace()
     d_ret:logModel.logResponse = logController.save(logPayload)
     return d_ret
 
