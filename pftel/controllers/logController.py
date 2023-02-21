@@ -67,50 +67,81 @@ def save(
     Parse the incoming payload, and write appropriate
     information to some storage resource.
 
+    The "directory" analogous organization:
+
+        
+
     Args:
         payload (logModel.logStructured): the load payload
     """
-    b_saved:bool        = False
-    message:str         = "Nothing was saved -- logObject probably doesn't exist"
-    str_containerDir:str= '%s/%s/%s'% (config.dbAPI.dobj_DB.DB, payload.logObject, payload.logCollection)
-    str_logThis:str     = '%s'      % payload.logEvent
-    str_container:str   = '%s/%s'   % (str_containerDir, str_logThis)
+    timestamp = lambda : '%s' % datetime.now()
+    list_logObjects         = \
+        lambda      : config.dbAPI.telemetryService_listObjs()
+    logCollection_exists  = \
+        lambda      : config.dbAPI.DB.exists(payload.logCollection, path = str_logObjDir)
+    logCollection_create  = \
+        lambda      : config.dbAPI.DB.mkdir(str_collectionDir)
+    logEvents_get = \
+        lambda      : config.dbAPI.telemetryService_eventList(
+                            payload.logObject,
+                            payload.logCollection
+                    )
+    logEvent_getCSV = \
+        lambda x    : config.dbAPI.telemetryService_dictAsCSV(
+                        config.dbAPI.telemetryService_event(
+                            payload.logObject,
+                            payload.logCollection,
+                            x
+                        )
+        )
+    logContainer_load       = \
+        lambda      : config.dbAPI.DB.cat(str_container)
+    logEvent_write      = \
+        lambda x    : config.dbAPI.DB.touch(str_event, x)
+    logEvent_commit     = \
+        lambda      : config.dbAPI.DB.node_save('',
+                            startPath       = str_containerDir,
+                            pathDiskRoot    = '%s' % (
+                                config.dbAPI.str_FSprefix,
+                            ),
+                            failOnDirExist  = False
+                    )
 
-    list_logObjects         = lambda    : config.dbAPI.telemetryService_listObjs()
-    logContainerDir_exists  = lambda    : config.dbAPI.DB.exists(
-                                              str_logThis, path = str_containerDir)
-    logContainerDir_create  = lambda    : config.dbAPI.DB.mkdir(str_containerDir)
-    logContainer_load       = lambda    : config.dbAPI.DB.cat(str_container)
-    logContainer_write      = lambda x  : config.dbAPI.DB.touch(str_container, x)
-    logContainer_commit     = lambda    : config.dbAPI.DB.node_save('',
-                                            startPath       = str_containerDir,
-                                            pathDiskRoot    = '%s' % (
-                                                config.dbAPI.str_FSprefix,
-                                            ),
-                                            failOnDirExist  = False
-                                    )
+    d_logEvent:dict      = {
+        '__id'          : -1,
+        '__timestamp'   : timestamp(),
+        'appName'       : payload.appName,
+        'execTime'      : payload.execTime,
+        'extra'         : payload.extra
+    }
+    d_ret:dict          = {
+        'log'           : d_logEvent,
+        'status'        : False,
+        'timestamp'     : d_logEvent['__timestamp'],
+        'message'       :
+            f"Nothing was saved -- logObject '{payload.logObject}' doesn't exist. Create with an appropriate PUT request!"
+    }
+    str_logObjDir:str       = '%s/%s'   % (config.dbAPI.dobj_DB.DB, payload.logObject)
+    str_containerDir:str    = '%s/%s'   % (str_logObjDir, payload.logCollection)
+    # str_logEvent:str        = '%s'      % payload.logEvent
+    # str_container:str   = '%s/%s'   % (str_containerDir, str_logEvent)
 
-    d_logThis       : dict  = {
-        'appName'   : payload.appName,
-        'execTime'  : payload.execTime,
-        'extra'     : payload.extra
-    }
-    d_existingLog   : dict  = {}
-    if payload.logObject in list_logObjects():
-        if not logContainerDir_exists():
-            logContainerDir_create()
-        d_existingLog.update(d_logThis)
-        logContainer_write(d_existingLog)
-        logContainer_commit()
-        b_saved = True
-        message = f"Saved log {str_container}"
-    LOG(message)
-    return {
-        'response':     d_logThis,
-        'status':       b_saved,
-        'timestamp':    '%s' % datetime.now(),
-        'message':      message
-    }
+    if not payload.logObject in list_logObjects():
+        return d_ret
+
+    d_existingLog:dict      = {}
+    if not logContainerDir_exists():
+        logContainerDir_create()
+    d_ret['log']['__id']    = len(logEvents_get())
+    str_logEvent:str        = '%s-%s'   % (d_ret['log']['__id'], payload.logEvent)
+    str_container:str       = '%s/%s'   % (str_containerDir, str_logEvent)
+    d_existingLog.update(d_logEvent)
+    logContainer_write(d_existingLog)
+    logContainer_commit()
+    d_ret['status'] = True
+    d_ret['message'] = f"Saved log {str_container}"
+    LOG(logEvent_getCSV(str_logEvent))
+    return d_ret
 
 def internalObject_initOrUpdate(
         logObj:str,
@@ -124,9 +155,11 @@ def internalObject_initOrUpdate(
     Returns:
         logModel.logResponse: create/update response
     """
-    return config.dbAPI.telemetryService_initObj(
+    d_ret:dict = config.dbAPI.telemetryService_initObj(
         logObj, d_data
     )
+    LOG(d_ret['message'])
+    return d_ret
 
 def internalObjects_getList() -> list:
     """
@@ -185,7 +218,7 @@ def internalObjectCollection_getEvents(
             collectionName:str
 ) -> list:
     """
-    Return a list representation of all the "events" thatubuntu ping package
+    Return a list representation of all the "events" that
     exist for this collection. An "event" is the atomic element
     in the logger universe, and is the actual telemetry data
     transmitted by an application, for instance an application
