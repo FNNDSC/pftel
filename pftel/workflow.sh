@@ -237,6 +237,16 @@ logEvent_getAllAsCSV () {
   echo -n $RESP | tr -d '"'
 }
 
+test_feedLog () {
+  obj=$1
+  collection=$2
+  logObj_create   $obj
+  mha-to-dcm      $obj $collection 0.353
+  inference       $obj $collection 12.345
+  measure         $obj $collection 4.234
+  push_to_PACS    $obj $collection 3.2
+}
+
 #
 # And we're done!
 # _-30-_
