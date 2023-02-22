@@ -69,7 +69,12 @@ def save(
 
     The "directory" analogous organization:
 
-        
+        <DB>/<logObject>/<logCollection>/<event1>
+                                        /<event2>
+                                        /<event3>
+                        ...
+                                        /<eventN>
+
 
     Args:
         payload (logModel.logStructured): the load payload
@@ -94,22 +99,25 @@ def save(
                             x
                         )
         )
-    logContainer_load       = \
-        lambda      : config.dbAPI.DB.cat(str_container)
+    logEvent_load       = \
+        lambda      : config.dbAPI.DB.cat(str_logEventPath)
     logEvent_write      = \
-        lambda x    : config.dbAPI.DB.touch(str_event, x)
+        lambda x    : config.dbAPI.DB.touch(str_logEventPath, x)
     logEvent_commit     = \
         lambda      : config.dbAPI.DB.node_save('',
-                            startPath       = str_containerDir,
+                            startPath       = str_collectionDir,
                             pathDiskRoot    = '%s' % (
                                 config.dbAPI.str_FSprefix,
                             ),
                             failOnDirExist  = False
                     )
+    logEvent_parseCSV = \
+        lambda x    : x.replace(',', '│')
+
 
     d_logEvent:dict      = {
-        '__id'          : -1,
-        '__timestamp'   : timestamp(),
+        '_id'           : -1,
+        '_timestamp'    : timestamp(),
         'appName'       : payload.appName,
         'execTime'      : payload.execTime,
         'extra'         : payload.extra
@@ -117,30 +125,28 @@ def save(
     d_ret:dict          = {
         'log'           : d_logEvent,
         'status'        : False,
-        'timestamp'     : d_logEvent['__timestamp'],
+        'timestamp'     : d_logEvent['_timestamp'],
         'message'       :
             f"Nothing was saved -- logObject '{payload.logObject}' doesn't exist. Create with an appropriate PUT request!"
     }
+    d_ret['log']['_id']     = len(logEvents_get())
     str_logObjDir:str       = '%s/%s'   % (config.dbAPI.dobj_DB.DB, payload.logObject)
-    str_containerDir:str    = '%s/%s'   % (str_logObjDir, payload.logCollection)
-    # str_logEvent:str        = '%s'      % payload.logEvent
-    # str_container:str   = '%s/%s'   % (str_containerDir, str_logEvent)
+    str_collectionDir:str   = '%s/%s'   % (str_logObjDir, payload.logCollection)
+    str_logEvent:str        = '%s-%s'   % (d_ret['log']['_id'], payload.logEvent)
+    str_logEventPath:str    = '%s/%s'   % (str_collectionDir, str_logEvent)
 
     if not payload.logObject in list_logObjects():
         return d_ret
 
     d_existingLog:dict      = {}
-    if not logContainerDir_exists():
-        logContainerDir_create()
-    d_ret['log']['__id']    = len(logEvents_get())
-    str_logEvent:str        = '%s-%s'   % (d_ret['log']['__id'], payload.logEvent)
-    str_container:str       = '%s/%s'   % (str_containerDir, str_logEvent)
+    if not logCollection_exists():
+        logCollection_create()
     d_existingLog.update(d_logEvent)
-    logContainer_write(d_existingLog)
-    logContainer_commit()
+    logEvent_write(d_existingLog)
+    logEvent_commit()
     d_ret['status'] = True
-    d_ret['message'] = f"Saved log {str_container}"
-    LOG(logEvent_getCSV(str_logEvent))
+    d_ret['message'] = f"Saved log {str_logEventPath}"
+    LOG(logEvent_parseCSV(logEvent_getCSV(str_logEvent)).replace('\n', ''))
     return d_ret
 
 def internalObject_initOrUpdate(
