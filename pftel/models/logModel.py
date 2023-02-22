@@ -7,7 +7,7 @@ str_description = """
 from    pydantic            import BaseModel, Field
 from    typing              import Optional, List, Dict
 from    datetime            import datetime
-
+from    enum                import Enum
 from    pathlib             import Path
 import  pudb
 
@@ -39,6 +39,13 @@ class logStructured(BaseModel):
     appName                             : str   = ""
     execTime                            : float = 0.0
     extra                               : str   = ""
+
+class logPadding(Enum):
+    _id                                 : int   = 5
+    _timestamp                          : int   = 26
+    appName                             : int   = 20
+    execTime                            : int   = 10
+    extra                               : int   = 40
 
 class logBoolReturn(BaseModel):
     status                              : bool  = False
