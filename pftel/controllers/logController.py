@@ -97,7 +97,7 @@ def save(
                             payload.logObject,
                             payload.logCollection,
                             x
-                        )
+                        ), separator = '│', applyPadding = True
         )
     logEvent_load       = \
         lambda      : config.dbAPI.DB.cat(str_logEventPath)
@@ -129,7 +129,7 @@ def save(
         'message'       :
             f"Nothing was saved -- logObject '{payload.logObject}' doesn't exist. Create with an appropriate PUT request!"
     }
-    d_ret['log']['_id']     = len(logEvents_get())
+    d_ret['log']['_id']     = '%03d'    % len(logEvents_get())
     str_logObjDir:str       = '%s/%s'   % (config.dbAPI.dobj_DB.DB, payload.logObject)
     str_collectionDir:str   = '%s/%s'   % (str_logObjDir, payload.logCollection)
     str_logEvent:str        = '%s-%s'   % (d_ret['log']['_id'], payload.logEvent)
