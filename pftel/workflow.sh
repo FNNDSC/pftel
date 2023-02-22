@@ -74,6 +74,11 @@ docker run --rm -it                                                            \
 # To access the API swagger documentation, point a brower at:
 export swaggerURL=":22223/docs"
 
+randtime_generate () {
+  range=$1
+  shuf -i 1-$1 -n 1 | xargs -i% echo "scale = 4; %/1000"  | bc
+}
+
 ###############################################################################
 #_____________________________________________________________________________#
 # L O G G E R   s e t u p                                                     #
@@ -148,7 +153,7 @@ inference () {
       "logObject": "'$obj'",
       "logCollection": "'$collection'",
       "logEvent": "heatmaps",
-      "appName": "pl-LLD_infertence",
+      "appName": "pl-LLD_inference",
       "execTime": '$time',
       "extra": ""
     }' | jq
@@ -241,10 +246,10 @@ test_feedLog () {
   obj=$1
   collection=$2
   logObj_create   $obj
-  mha-to-dcm      $obj $collection 0.353
-  inference       $obj $collection 12.345
-  measure         $obj $collection 4.234
-  push_to_PACS    $obj $collection 3.2
+  mha-to-dcm      $obj $collection $(randtime_generate 1000)
+  inference       $obj $collection $(randtime_generate 100000)
+  measure         $obj $collection $(randtime_generate 10000)
+  push_to_PACS    $obj $collection $(randtime_generate 10000)
 }
 
 #
