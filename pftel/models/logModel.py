@@ -47,6 +47,14 @@ class logPadding(Enum):
     execTime                            : int   = 10
     extra                               : int   = 40
 
+class logFormatting(Enum):
+    _id                                 : str   = "int"
+    _timestamp                          : str   = "str"
+    appName                             : str   = "str"
+    execTime                            : str   = "float"
+    extra                               : str   = "str"
+
+
 class logBoolReturn(BaseModel):
     status                              : bool  = False
 
