@@ -268,41 +268,100 @@ class PFdb():
         return l_ret
 
     def telemetryService_padWidth(self,
-                d_event:dict) -> dict:
-        """Add padding to values in a dictionary using a model
+                d_event:dict,
+                **kwargs) -> list:
+        """
+        Return a list of either dictionary values or keys, padded
+        according to corresponding enum classes in the model definition.
+
+        By default the _values_ in the passed dictionary are padded
+        and returned. To pad instead the _keys_ of the dictionary
+        instead pass a
+
+                use = 'keys'
+
+        kwarg.
 
         Args:
             d_event (dict): The dictionary event to pad
 
         Returns:
-            dict: A padded version of the input
+            list: A padded list of either the 'values' or 'keys'
         """
-        d_padded:dict   = {}
-        for (k,v), pad in zip(d_event.items(), logModel.logPadding):
-            d_padded[k] = '%*s' %(pad.value, v)
-        return d_padded
+        str_use:str             = 'values'
+        for k,v in kwargs.items():
+            if k == 'use':   str_use  = v
+        d_paddedValues:dict     = {}
+        d_paddedKeys:dict       = {}
+        for k,v in d_event.items():
+            if logModel.logFormatting[k].value == 'int':
+                d_paddedValues[k]   = "%0*d"    % (logModel.logPadding[k].value, int(v))
+                d_paddedKeys[k]     = "%*s"     % (logModel.logPadding[k].value, k)
+            if logModel.logFormatting[k].value == 'float':
+                d_paddedValues[k]   = "%*.4f"   % (logModel.logPadding[k].value, float(v))
+                d_paddedKeys[k]     = "%*s"     % (logModel.logPadding[k].value, k)
+            if logModel.logFormatting[k].value == 'str':
+                d_paddedValues[k]   = '%*s'     % (logModel.logPadding[k].value, v)
+                d_paddedKeys[k]     = "%*s"     % (logModel.logPadding[k].value, k)
+        if str_use == 'keys':
+            return d_paddedKeys.values()
+        else:
+            return d_paddedValues.values()
 
     def telemetryService_dictAsCSV(self,
-                d_event:dict)-> str:
-        """Convert a dictionary into a CSV string
+                d_event:dict,
+                **kwargs) -> str:
+        """Convert either the values or keys of a dictionary into a CSV string.
+        The following kwargs are set as defaults:
+
+            separator       = ','
+            applyPadding    = True
+            use             = 'values'
+
+        where:
+
+            * <separator> is the CSV separator
+            * if <applyPadding> then pad fields according to enum classes in
+              the model
+            * <use> either the dictionary 'values' or 'keys'.
 
         Args:
             d_event (dict): an arbitrary dictionary
 
         Returns:
-            str: a CSV formatted string representation of the dictionary values
+            str: a CSV formatted string representation of the dictionary values, with
+                 field padding applied.
         """
-        str_CSV:str     = ""
-        str_CSV += ','.join(str(x) for x in self.telemetryService_padWidth(d_event).values())
+        str_separator:str   = ","
+        str_use:str         = 'values'
+        b_applyPadding:bool = False
+        str_CSV:str         = ""
+        for k,v in kwargs.items():
+            if k == 'separator'     :   str_separator   = v
+            if k == 'use'           :   str_use         = v
+            if k == 'applyPadding'  :   b_applyPadding  = v
+
+        lcsv_get            = \
+            lambda doPadding, use : self.telemetryService_padWidth(d_event, use = use) if doPadding \
+                        else list(d_event.keys()) if use == 'keys' \
+                        else list(d_event.values())
+
+        str_CSV   += str_separator.join(str(x) for x in lcsv_get(b_applyPadding, str_use))
+        # str_CSV += str_separator.join(x for x in lcsv_get())
+        # str_CSV += str_separator.join(str(x) for x in self.telemetryService_padWidth(d_event).values())
         str_CSV += '\n'
         return str_CSV
 
     def telemetryService_collectionGetCSV(self,
                 str_objName,
-                str_collectionName) -> str:
+                str_collectionName,
+                **kwargs) -> str:
         """
         Return a CSV formatted string of "event" data for the passed obj/collection
         """
+        str_format:str  = "plain"
+        for k,v in kwargs.items():
+            if k == 'format':   str_format = v
         str_CSV:str     = ""
         l_events:list   = [
             self.telemetryService_event(
@@ -312,8 +371,14 @@ class PFdb():
                         )
         ]
         if len(l_events):
-            str_CSV = ','.join(l_events[0].keys()) + '\n'
+            if str_format == 'fancy':
+                str_CSV = '│'.join(l_events[0].keys()) + '\n'
+            else:
+                str_CSV = ','.join(l_events[0].keys()) + '\n'
             for el in l_events:
-                str_CSV += ','.join(str(x) for x in el.values())
+                if str_format == 'fancy':
+                    str_CSV += '│'.join(str(x) for x in self.telemetryService_padWidth(el).values())
+                else:
+                    str_CSV += ','.join(str(x) for x in el.values())
                 str_CSV += '\n'
         return str_CSV
