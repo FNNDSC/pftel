@@ -147,7 +147,7 @@ async def logEvents_getForObjectCollection(
     "/log/{logObject}/{logCollection}/{logEvent}/",
     response_model  = Dict,
     summary         = """
-    GET a specific event that exist in this log object collection.
+    GET a specific event that exists in this log object collection.
     """
 )
 async def logEvent_getForObjectCollection(
@@ -200,15 +200,20 @@ async def log_getForObjectCollection(
 )
 async def log_getForObjectCollectionAsCSV(
     logObject:str,
-    logCollection:str
+    logCollection:str,
+    style:str = 'plain'
 ) -> str:
     """
     Description
     -----------
     GET all the events in the collection `logCollection` of the object
     `logObject` as a CSV formatted string.
+
+    By passing a URl query as `style=fancy` a _fancy_ CSV payload is
+    returned.
     """
     return logController.internalObjectCollection_getCSV(
         logObject,
-        logCollection
+        logCollection,
+        format = style
     )
