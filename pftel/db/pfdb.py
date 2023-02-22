@@ -5,6 +5,7 @@ from    datetime        import datetime
 
 from    pfstate         import  S
 from    pfmisc.C_snode  import C_stree
+from    models          import logModel
 import  config
 import  sys
 
@@ -266,6 +267,21 @@ class PFdb():
         ]
         return l_ret
 
+    def telemetryService_padWidth(self,
+                d_event:dict) -> dict:
+        """Add padding to values in a dictionary using a model
+
+        Args:
+            d_event (dict): The dictionary event to pad
+
+        Returns:
+            dict: A padded version of the input
+        """
+        d_padded:dict   = {}
+        for (k,v), pad in zip(d_event.items(), logModel.logPadding):
+            d_padded[k] = '%*s' %(pad.value, v)
+        return d_padded
+
     def telemetryService_dictAsCSV(self,
                 d_event:dict)-> str:
         """Convert a dictionary into a CSV string
@@ -277,7 +293,7 @@ class PFdb():
             str: a CSV formatted string representation of the dictionary values
         """
         str_CSV:str     = ""
-        str_CSV += ','.join(str(x) for x in d_event.values())
+        str_CSV += ','.join(str(x) for x in self.telemetryService_padWidth(d_event).values())
         str_CSV += '\n'
         return str_CSV
 
