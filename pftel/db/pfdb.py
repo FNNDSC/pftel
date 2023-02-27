@@ -235,6 +235,7 @@ class PFdb():
         l_ret:list  = []
         if str_collectionName in self.telemetryService_collectionList(str_objName):
             l_ret = list(self.DB.lsf('%s/%s/%s' % (DBstate.DB, str_objName, str_collectionName)))
+        l_ret.sort()
         return l_ret
 
     def telemetryService_event(self,
@@ -282,6 +283,9 @@ class PFdb():
 
         kwarg.
 
+        Keep in mind this is a "row" dominant list across each row of
+        a table!
+
         Args:
             d_event (dict): The dictionary event to pad
 
@@ -289,29 +293,37 @@ class PFdb():
             list: A padded list of either the 'values' or 'keys'
         """
         str_use:str             = 'values'
+        str_flush:str           = '─'
         for k,v in kwargs.items():
             if k == 'use':   str_use  = v
         d_paddedValues:dict     = {}
         d_paddedKeys:dict       = {}
+        d_paddedFlush:dict      = {}
         for k,v in d_event.items():
             if logModel.logFormatting[k].value == 'int':
                 d_paddedValues[k]   = "%0*d"    % (logModel.logPadding[k].value, int(v))
-                d_paddedKeys[k]     = "%*s"     % (logModel.logPadding[k].value, k)
+                d_paddedKeys[k]     = k.center(logModel.logPadding[k].value)
             if logModel.logFormatting[k].value == 'float':
                 d_paddedValues[k]   = "%*.4f"   % (logModel.logPadding[k].value, float(v))
-                d_paddedKeys[k]     = "%*s"     % (logModel.logPadding[k].value, k)
+                d_paddedKeys[k]     = k.center(logModel.logPadding[k].value)
             if logModel.logFormatting[k].value == 'str':
-                d_paddedValues[k]   = '%*s'     % (logModel.logPadding[k].value, v)
-                d_paddedKeys[k]     = "%*s"     % (logModel.logPadding[k].value, k)
+                d_paddedValues[k]   = v.center(logModel.logPadding[k].value)
+                d_paddedKeys[k]     = k.center(logModel.logPadding[k].value)
+            d_paddedFlush[k]    = str_flush * logModel.logPadding[k].value
         if str_use == 'keys':
             return d_paddedKeys.values()
+        elif str_use == 'flush':
+            return d_paddedFlush.values()
         else:
             return d_paddedValues.values()
 
     def telemetryService_dictAsCSV(self,
                 d_event:dict,
                 **kwargs) -> str:
-        """Convert either the values or keys of a dictionary into a CSV string.
+        """
+        Convert either the values or keys of a dictionary into a CSV string,
+        with options to pad this string to fixed width lengths.
+
         The following kwargs are set as defaults:
 
             separator       = ','
@@ -323,7 +335,7 @@ class PFdb():
             * <separator> is the CSV separator
             * if <applyPadding> then pad fields according to enum classes in
               the model
-            * <use> either the dictionary 'values' or 'keys'.
+            * <use> a choice of 'values', 'keys', or 'flush'.
 
         Args:
             d_event (dict): an arbitrary dictionary
@@ -340,15 +352,13 @@ class PFdb():
             if k == 'separator'     :   str_separator   = v
             if k == 'use'           :   str_use         = v
             if k == 'applyPadding'  :   b_applyPadding  = v
-
         lcsv_get            = \
-            lambda doPadding, use : self.telemetryService_padWidth(d_event, use = use) if doPadding \
-                        else list(d_event.keys()) if use == 'keys' \
-                        else list(d_event.values())
+            lambda doPadding, use   : \
+                self.telemetryService_padWidth(d_event, use = use)  if doPadding \
+                    else list(d_event.keys()) if use == 'keys'      \
+                    else list(d_event.values())
 
-        str_CSV   += str_separator.join(str(x) for x in lcsv_get(b_applyPadding, str_use))
-        # str_CSV += str_separator.join(x for x in lcsv_get())
-        # str_CSV += str_separator.join(str(x) for x in self.telemetryService_padWidth(d_event).values())
+        str_CSV += str_separator.join(str(x) for x in lcsv_get(b_applyPadding, str_use))
         str_CSV += '\n'
         return str_CSV
 
@@ -359,9 +369,29 @@ class PFdb():
         """
         Return a CSV formatted string of "event" data for the passed obj/collection
         """
+        CSV_getStr      = \
+            lambda d, sep, field, padding : self.telemetryService_dictAsCSV(
+                d, separator = sep, use = field, applyPadding = padding
+            )
+        table_topBorder = \
+            lambda d : self.telemetryService_dictAsCSV(
+                d, separator = '┬', use = 'flush', applyPadding = True
+            )
+        table_middleBorder = \
+            lambda d : self.telemetryService_dictAsCSV(
+                d, separator = '┼', use = 'flush', applyPadding = True
+            )
+        table_bottomBorder = \
+            lambda d : self.telemetryService_dictAsCSV(
+                d, separator = '┴', use = 'flush', applyPadding = True
+            )
         str_format:str  = "plain"
+        str_sep:str     = ','
+        b_padding:bool  = False
         for k,v in kwargs.items():
-            if k == 'format':   str_format = v
+            if k == 'format'        : str_format = v
+            if k == 'applyPadding'  : b_padding     = v
+        if str_format == 'fancy': str_sep = '│'
         str_CSV:str     = ""
         l_events:list   = [
             self.telemetryService_event(
@@ -371,14 +401,56 @@ class PFdb():
                         )
         ]
         if len(l_events):
-            if str_format == 'fancy':
-                str_CSV = '│'.join(l_events[0].keys()) + '\n'
-            else:
-                str_CSV = ','.join(l_events[0].keys()) + '\n'
+            # Get the "headers"
+            if str_format == 'fancy': str_CSV += table_topBorder(l_events[0])
+            str_CSV += CSV_getStr(l_events[0], str_sep, 'keys', b_padding)
+            if str_format == 'fancy': str_CSV += table_middleBorder(l_events[0])
+            # Now for the table body
             for el in l_events:
-                if str_format == 'fancy':
-                    str_CSV += '│'.join(str(x) for x in self.telemetryService_padWidth(el).values())
-                else:
-                    str_CSV += ','.join(str(x) for x in el.values())
-                str_CSV += '\n'
+                str_CSV += CSV_getStr(el, str_sep, 'values', b_padding)
+            if str_format == 'fancy': str_CSV += table_bottomBorder(l_events[0])
         return str_CSV
+
+    def telemetryService_collectionGetMatrix(self,
+                str_objName,
+                str_collectionName,
+                **kwargs) -> dict:
+        """
+        Return a named "matrix", i.e. a dictionary containing a list of
+        lists of "event" data for the passed obj/collection. This is
+        essentially a CSV "table" but each column of the table is a list.
+        Taken together, all the lists are further packaged into a list,
+        resulting in the "list of lists", where each list is one "column".
+
+        The first element of each list is the column header -- hence all list
+        contents are strings. Callers should parse/process the matrix as they
+        see fit.
+        """
+        d_ret:dict      = {
+            str_collectionName  : []
+        }
+        l_events:list   = [
+            self.telemetryService_event(
+                str_objName, str_collectionName, x
+            ) for x in self.telemetryService_eventList(
+                            str_objName, str_collectionName
+                        )
+        ]
+        l_header:list       = []
+        l_table:list[list]  = []
+        colCount:int        = 0
+        if len(l_events):
+            # Get the "headers"
+            l_header = list(l_events[0].keys())
+            for heading in l_header:
+                l_table.append([])
+                l_table[colCount].append(str(heading))
+                colCount += 1
+            for el in l_events:
+                colCount = 0
+                for body in el.values():
+                    l_table[colCount].append(str(body))
+                    colCount += 1
+        d_ret[str_collectionName] = l_table
+        return d_ret
+
