@@ -223,10 +223,11 @@ def internalObjectCollection_getCSV(
         objName, collectionName, **kwargs
     )
 
-def stats_describe(lstr_col:list[str]) -> dict:
+def stats_describe(lstr_col:list) -> dict:
     """
     Describe and return some statistics on the passed list
-    of strings
+    of strings. Note that all elements of the list, while
+    strings, must be interpretable as floats.
 
     Args:
         lstr_col (list[str]): a list of strings corresponding to
@@ -241,6 +242,7 @@ def stats_describe(lstr_col:list[str]) -> dict:
     des:np.DescribeResult   = stats.describe(np_col)
     d_ret       = {
                 'sum'       : sum(np_col),
+                'minmax'    : des.minmax,
                 'mean'      : des.mean,
                 'variance'  : des.variance,
                 'nobs'      : des.nobs,
@@ -249,16 +251,11 @@ def stats_describe(lstr_col:list[str]) -> dict:
     }
     return d_ret
 
-def internalObjectCollection_getStats(
-            objName:str,
-            collectionName:str,
-            **kwargs
-) -> dict:
+def listTable_statsOnCol(ll_table, **kwargs) -> dict:
     """
-    Return a dictionary representation describing the statistics over
-    the events of a collection
+    For a list (of lists) table, and a column to process in **kwargs,
+    return a dictionary of stats on that column.
     """
-
     str_statsCol:str    = ''
     for k,v in kwargs.items():
         if k == 'column':  str_statsCol = v
@@ -267,20 +264,33 @@ def internalObjectCollection_getStats(
     d_ret:dict          = {
         'error' :       f'Column with header {str_statsCol} was not found in this collection'
     }
+    l_header:list   = [x[0] for x in ll_table]
+    try:
+        col         = l_header.index(str_statsCol)
+        d_ret       = stats_describe(ll_table[col][1:])
+    except:
+        pass
+    return d_ret
+
+
+def internalObjectCollection_getStats(
+            objName:str,
+            collectionName:str,
+            **kwargs
+) -> dict:
+    """
+    Return a dictionary representation describing the statistics over
+    the events of a collection.
+    """
 
     ll_table:list[list] = config.dbAPI.telemetryService_collectionGetMatrix(
         objName, collectionName, **kwargs
     )[collectionName]
 
-    l_header:list   = [x[0] for x in ll_table]
-    try:
-        col         = l_header.index(str_statsCol)
-        d_ret       = {
-            collectionName  : stats_describe(ll_table[col][1:])
-        }
-    except:
-        pass
-    if len(d_ret.keys()) > 1: del d_ret['error']
+    d_ret:dict          = {
+        collectionName :    listTable_statsOnCol(ll_table, **kwargs)
+    }
+
     return d_ret
 
 def internalObject_getStats(
@@ -288,8 +298,8 @@ def internalObject_getStats(
             **kwargs
 ) -> dict:
     """
-    Return a list of dictionaries describing the statistics over
-    the collection in an object
+    Return a dictionary of dictionaries describing the statistics over
+    all the collections in an object -- one dictionary key per collection.
     """
 
     d_ret   = {}
@@ -303,7 +313,7 @@ def internalObject_getStatsCumulative(
 ) -> dict:
     """
     Return a dictionary describing the statistics cumulated over
-    all the collections in an object
+    all the collections in an object.
     """
 
     d_ret   = {
@@ -320,10 +330,13 @@ def internalObject_getStatsCumulative(
             ll_tableCumulative  = d_tableCollection[collection].copy()
         else:
             colCount    = 0
-            for col in d_tableCollection[collection]:
-                ll_tableCumulative[colCount].append(col[1:])
-        d_ret.update(internalObjectCollection_getStats(objName, collection, **kwargs))
-    if len(d_ret.keys()) > 1: del d_ret['error']
+            ll_tableCumulative = [colCumulative + colCollected[1:] \
+                    for colCumulative,colCollected in \
+                        zip(ll_tableCumulative, d_tableCollection[collection])]
+    if len(ll_tableCumulative):
+        d_ret = {
+            objName     : listTable_statsOnCol(ll_tableCumulative, **kwargs)
+        }
     return d_ret
 
 def internalObjectCollection_getEvents(
