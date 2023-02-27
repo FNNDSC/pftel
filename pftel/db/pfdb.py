@@ -226,6 +226,7 @@ class PFdb():
         l_ret:list  = []
         if str_objName in self.telemetryService_listObjs():
             l_ret = list(self.DB.lstr_lsnode('%s/%s' % (DBstate.DB, str_objName)))
+        l_ret.sort()
         return l_ret
 
     def telemetryService_eventList(self, str_objName, str_collectionName) -> list:
