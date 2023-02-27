@@ -242,7 +242,7 @@ async def log_getStatsForObjectCollection(
     The URL query `key=<key>` specifies the actual key field in the event
     collection to process. This field key must contain numeric values.
     """
-    pudb.set_trace()
+    # pudb.set_trace()
     return logController.internalObjectCollection_getStats(
         logObject,
         logCollection,
@@ -272,7 +272,7 @@ async def log_getStatsForObject(
     The URL query `key=<key>` specifies the actual key field in the event
     collection to process. This field key must contain numeric values.
     """
-    pudb.set_trace()
+    # pudb.set_trace()
     return logController.internalObject_getStats(
         logObject,
         column          = key
@@ -299,7 +299,7 @@ async def log_processStatsForObject(
     The URL query `key=<key>` specifies the actual key field in the event
     collection to process. This field key must contain numeric values.
     """
-    pudb.set_trace()
+    # pudb.set_trace()
     return logController.internalObject_getStatsCumulative(
         logObject,
         column          = key
