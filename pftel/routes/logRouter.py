@@ -65,7 +65,7 @@ async def log_write(
     previous telemetry logs, perform a GET request.
 
     """
-    pudb.set_trace()
+    # pudb.set_trace()
     d_ret:logModel.logResponse = logController.save(logPayload)
     return d_ret
 
@@ -201,7 +201,8 @@ async def log_getForObjectCollection(
 async def log_getForObjectCollectionAsCSV(
     logObject:str,
     logCollection:str,
-    style:str = 'plain'
+    style:str       = 'plain',
+    padding:bool    = False
 ) -> str:
     """
     Description
@@ -209,11 +210,98 @@ async def log_getForObjectCollectionAsCSV(
     GET all the events in the collection `logCollection` of the object
     `logObject` as a CSV formatted string.
 
-    By passing a URl query as `style=fancy` a _fancy_ CSV payload is
+    By passing a URL query as `style=fancy` a _fancy_ CSV payload is
     returned.
     """
     return logController.internalObjectCollection_getCSV(
         logObject,
         logCollection,
-        format = style
+        format          = style,
+        applyPadding    = padding
     )
+
+@router.get(
+    "/log/{logObject}/{logCollection}/stats",
+    response_model  = dict,
+    summary         = """
+    GET stats on the specified log object collection. The column to
+    process is specified in the optional query parameter.
+    """
+)
+async def log_getStatsForObjectCollection(
+    logObject:str,
+    logCollection:str,
+    key:str         = 'execTime',
+) -> dict:
+    """
+    Description
+    -----------
+    GET statistics on all the events in the collection `logCollection` of
+    the object `logObject`.
+
+    The URL query `key=<key>` specifies the actual key field in the event
+    collection to process. This field key must contain numeric values.
+    """
+    pudb.set_trace()
+    return logController.internalObjectCollection_getStats(
+        logObject,
+        logCollection,
+        column          = key
+    )
+
+@router.get(
+    "/log/{logObject}/stats",
+    response_model  = dict,
+    summary         = """
+    GET stats on the specified log object collection. The column to
+    process is specified in the optional query parameter. A dictionary
+    of keys where each key is one object collection is returned.
+    """
+)
+async def log_getStatsForObject(
+    logObject:str,
+    key:str         = 'execTime',
+) -> dict:
+    """
+    Description
+    -----------
+    GET a dictionary keyed on collections of all the collections events
+    of object `logObject`. The stats of each collection are returned without
+    further processing.
+
+    The URL query `key=<key>` specifies the actual key field in the event
+    collection to process. This field key must contain numeric values.
+    """
+    pudb.set_trace()
+    return logController.internalObject_getStats(
+        logObject,
+        column          = key
+    )
+
+@router.get(
+    "/log/{logObject}/stats_process",
+    response_model  = dict,
+    summary         = """
+    GET processed stats on the entire specified log object collection. The
+    column to process is specified in the optional query parameter.
+    """
+)
+async def log_processStatsForObject(
+    logObject:str,
+    key:str         = 'execTime',
+) -> dict:
+    """
+    Description
+    -----------
+    GET a processed result of all the events in all the collections
+    of object `logObject`. A single dictionary `allCollections` is returned.
+
+    The URL query `key=<key>` specifies the actual key field in the event
+    collection to process. This field key must contain numeric values.
+    """
+    pudb.set_trace()
+    return logController.internalObject_getStatsCumulative(
+        logObject,
+        column          = key
+    )
+
