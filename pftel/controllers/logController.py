@@ -11,6 +11,9 @@ from    fastapi.concurrency import  run_in_threadpool
 from    pydantic            import  BaseModel, Field
 from    typing              import  Optional, List, Dict, Callable, Any
 
+import  numpy               as      np
+from    scipy               import  stats
+
 from    .jobController      import  jobber
 import  asyncio
 import  subprocess
@@ -91,14 +94,6 @@ def save(
                             payload.logObject,
                             payload.logCollection
                     )
-    logEvent_getCSV = \
-        lambda x    : config.dbAPI.telemetryService_dictAsCSV(
-                        config.dbAPI.telemetryService_event(
-                            payload.logObject,
-                            payload.logCollection,
-                            x
-                        ), separator = '│', applyPadding = True
-        )
     logEvent_load       = \
         lambda      : config.dbAPI.DB.cat(str_logEventPath)
     logEvent_write      = \
@@ -111,6 +106,14 @@ def save(
                             ),
                             failOnDirExist  = False
                     )
+    logEvent_getCSV = \
+        lambda x    : config.dbAPI.telemetryService_dictAsCSV(
+                        config.dbAPI.telemetryService_event(
+                            payload.logObject,
+                            payload.logCollection,
+                            x
+                        ), separator = '│', applyPadding = True
+        )
     logEvent_parseCSV = \
         lambda x    : x.replace(',', '│')
 
@@ -146,7 +149,7 @@ def save(
     logEvent_commit()
     d_ret['status'] = True
     d_ret['message'] = f"Saved log {str_logEventPath}"
-    LOG(logEvent_parseCSV(logEvent_getCSV(str_logEvent)).replace('\n', ''))
+    LOG(logEvent_getCSV(str_logEvent).replace('\n', ''))
     return d_ret
 
 def internalObject_initOrUpdate(
@@ -209,15 +212,119 @@ def internalObjectCollection_get(
 
 def internalObjectCollection_getCSV(
             objName:str,
-            collectionName:str
+            collectionName:str,
+            **kwargs
 ) -> str:
     """
     Return a list representation of all the "events" details
     for this collection.
     """
     return config.dbAPI.telemetryService_collectionGetCSV(
-        objName, collectionName
+        objName, collectionName, **kwargs
     )
+
+def stats_describe(lstr_col:list[str]) -> dict:
+    """
+    Describe and return some statistics on the passed list
+    of strings
+
+    Args:
+        lstr_col (list[str]): a list of strings corresponding to
+                              a column in a table.
+
+    Returns:
+        dict: a description of the statistics of the numerical
+              values in the <lstr_col>
+    """
+    d_ret:dict          = {}
+    np_col:np.array[float]  = np.array([float(x) for x in lstr_col])
+    des:np.DescribeResult   = stats.describe(np_col)
+    d_ret       = {
+                'sum'       : sum(np_col),
+                'mean'      : des.mean,
+                'variance'  : des.variance,
+                'nobs'      : des.nobs,
+                'skewness'  : des.skewness,
+                'kurtosis'  : des.kurtosis
+    }
+    return d_ret
+
+def internalObjectCollection_getStats(
+            objName:str,
+            collectionName:str,
+            **kwargs
+) -> dict:
+    """
+    Return a dictionary representation describing the statistics over
+    the events of a collection
+    """
+
+    str_statsCol:str    = ''
+    for k,v in kwargs.items():
+        if k == 'column':  str_statsCol = v
+
+    col:int             = 0
+    d_ret:dict          = {
+        'error' :       f'Column with header {str_statsCol} was not found in this collection'
+    }
+
+    ll_table:list[list] = config.dbAPI.telemetryService_collectionGetMatrix(
+        objName, collectionName, **kwargs
+    )[collectionName]
+
+    l_header:list   = [x[0] for x in ll_table]
+    try:
+        col         = l_header.index(str_statsCol)
+        d_ret       = {
+            collectionName  : stats_describe(ll_table[col][1:])
+        }
+    except:
+        pass
+    if len(d_ret.keys()) > 1: del d_ret['error']
+    return d_ret
+
+def internalObject_getStats(
+            objName:str,
+            **kwargs
+) -> dict:
+    """
+    Return a list of dictionaries describing the statistics over
+    the collection in an object
+    """
+
+    d_ret   = {}
+    for collection in internalObject_getCollections(objName):
+        d_ret.update(internalObjectCollection_getStats(objName, collection, **kwargs))
+    return d_ret
+
+def internalObject_getStatsCumulative(
+            objName:str,
+            **kwargs
+) -> dict:
+    """
+    Return a dictionary describing the statistics cumulated over
+    all the collections in an object
+    """
+
+    d_ret   = {
+        'error':    "Object '%s' not found!" % objName
+    }
+    d_tableCollection:dict          = {}
+    ll_tableCumulative:list[list]   = []
+    colCount:int                    = 0
+    for collection in internalObject_getCollections(objName):
+        d_tableCollection   = config.dbAPI.telemetryService_collectionGetMatrix(
+            objName, collection, **kwargs
+        )
+        if not len(ll_tableCumulative):
+            ll_tableCumulative  = d_tableCollection[collection].copy()
+        else:
+            colCount    = 0
+            for col in d_tableCollection[collection]:
+                ll_tableCumulative[colCount].append(col[1:])
+        d_ret.update(internalObjectCollection_getStats(objName, collection, **kwargs))
+    if len(d_ret.keys()) > 1: del d_ret['error']
+    return d_ret
 
 def internalObjectCollection_getEvents(
             objName:str,
