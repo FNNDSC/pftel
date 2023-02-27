@@ -242,6 +242,31 @@ logEvent_getAllAsCSV () {
   echo -n $RESP | tr -d '"'
 }
 
+logEvent_getStats () {
+  obj=$1
+  collection=$2
+  RESP=$(curl -s -X 'GET' \
+    "$PFTEL/api/v1/log/$obj/$collection/stats?key=execTime" \
+    -H 'accept: application/json')
+  echo -n $RESP | tr -d '"'
+}
+
+logCollection_getStats () {
+  obj=$1
+  RESP=$(curl -s -X 'GET' \
+    "$PFTEL/api/v1/log/$obj/$collection/stats?key=execTime" \
+    -H 'accept: application/json')
+  echo -n $RESP | tr -d '"'
+}
+
+logCollection_getStatsProcess () {
+  obj=$1
+  RESP=$(curl -s -X 'GET' \
+    "$PFTEL/api/v1/log/$obj/$collection/stats_process?key=execTime" \
+    -H 'accept: application/json')
+  echo -n $RESP | tr -d '"'
+}
+
 test_feedLog () {
   obj=$1
   collection=$2
