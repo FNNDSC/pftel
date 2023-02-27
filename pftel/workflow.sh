@@ -136,7 +136,7 @@ mha-to-dcm () {
       "logCollection": "'$collection'",
       "logEvent": "mha-to-dicom",
       "appName": "pl-mha2dicom",
-      "execTime": '$time',
+      "execTime": "'$time'",
       "extra": ""
     }' | jq
 }
@@ -154,7 +154,7 @@ inference () {
       "logCollection": "'$collection'",
       "logEvent": "heatmaps",
       "appName": "pl-LLD_inference",
-      "execTime": '$time',
+      "execTime": "'$time'",
       "extra": ""
     }' | jq
 }
@@ -172,7 +172,7 @@ measure () {
       "logCollection": "'$collection'",
       "logEvent": "measure",
       "appName": "pl-legMeas",
-      "execTime": '$time',
+      "execTime": "'$time'",
       "extra": ""
     }' | jq
 }
@@ -190,7 +190,7 @@ push_to_PACS () {
       "logCollection": "'$collection'",
       "logEvent": "push-to-pacs",
       "appName": "pl-orthanc_push",
-      "execTime": '$time',
+      "execTime": "'$time'",
       "extra": ""
     }' | jq
 }
@@ -237,7 +237,7 @@ logEvent_getAllAsCSV () {
   obj=$1
   collection=$2
   RESP=$(curl -s -X 'GET' \
-    "$PFTEL/api/v1/log/$obj/$collection/csv" \
+    "$PFTEL/api/v1/log/$obj/$collection/csv?style=fancy&padding=true" \
     -H 'accept: application/json')
   echo -n $RESP | tr -d '"'
 }
