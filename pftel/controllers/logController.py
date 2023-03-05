@@ -5,7 +5,7 @@ str_description = """
 
 from    concurrent.futures  import  ProcessPoolExecutor, ThreadPoolExecutor, Future
 
-from    fastapi             import  APIRouter, Query
+from    fastapi             import  APIRouter, Query, Request
 from    fastapi.encoders    import  jsonable_encoder
 from    fastapi.concurrency import  run_in_threadpool
 from    pydantic            import  BaseModel, Field
@@ -64,7 +64,8 @@ def noop():
     }
 
 def save(
-        payload             : logModel.logStructured
+        payload             : logModel.logStructured,
+        request             : Request
 ) -> dict:
     """
     Parse the incoming payload, and write appropriate
@@ -123,17 +124,20 @@ def save(
 
 
     d_logEvent:dict      = {
-        '_id'           : -1,
-        '_timestamp'    : timestamp(),
-        'appName'       : payload.appName,
-        'execTime'      : payload.execTime,
-        'payload'       : payload.payload
+        '_id'               : -1,
+        '_timestamp'        : timestamp(),
+        'appName'           : payload.appName,
+        'execTime'          : payload.execTime,
+        'requestHost'       : request.client.host,
+        'requestPort'       : str(request.client.port),
+        'requestUserAgent'  : request.headers['user-agent'],
+        'payload'           : payload.payload
     }
     d_ret:dict          = {
-        'log'           : d_logEvent,
-        'status'        : False,
-        'timestamp'     : d_logEvent['_timestamp'],
-        'message'       :
+        'log'               : d_logEvent,
+        'status'            : False,
+        'timestamp'         : d_logEvent['_timestamp'],
+        'message'           :
             f"Nothing was saved -- logObject '{payload.logObject}' doesn't exist. Create with an appropriate PUT request!"
     }
     d_ret['log']['_id']     = '%03d'    % len(logEvents_get())
@@ -160,6 +164,7 @@ def save(
 
 def slog_save(
     payload     : logModel.logSimple,
+    request     : Request,
     **kwargs
 ) -> dict:
     """Save an slog payload
@@ -184,7 +189,7 @@ def slog_save(
     logStructured.execTime                  = -1.0
     logStructured.logEvent                  = event
     logStructured.payload                   = payload.log
-    return save(logStructured)
+    return save(logStructured, request)
 
 def internalObject_initOrUpdate(
         logObj:str,
