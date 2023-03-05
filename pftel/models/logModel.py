@@ -37,6 +37,9 @@ class logStructured(BaseModel):
     logEvent                            : str   = ""
     appName                             : str   = ""
     execTime                            : float = 0.0
+    requestHost                         : str   = ""
+    requestPort                         : str   = ""
+    requestUserAgent                    : str   = ""
     payload                             : str   = ""
 
 class logPadding(Enum):
@@ -44,6 +47,9 @@ class logPadding(Enum):
     _timestamp                          : int   = 26
     appName                             : int   = 20
     execTime                            : int   = 10
+    requestHost                         : int   = 40
+    requestPort                         : int   = 12
+    requestUserAgent                    : int   = 65
     payload                             : int   = 60
 
 class logFormatting(Enum):
@@ -51,6 +57,9 @@ class logFormatting(Enum):
     _timestamp                          : str   = "str"
     appName                             : str   = "str"
     execTime                            : str   = "float"
+    requestHost                         : str   = "str"
+    requestPort                         : str   = "str"
+    requestUserAgent                    : str   = "str"
     payload                             : str   = "str"
 
 class logDelete(BaseModel):
