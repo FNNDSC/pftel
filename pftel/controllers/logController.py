@@ -81,6 +81,10 @@ def save(
 
     Args:
         payload (logModel.logStructured): the load payload
+
+    Returns:
+        dict: the return verification object
+
     """
     timestamp = lambda : '%s' % datetime.now()
     list_logObjects         = \
@@ -114,8 +118,8 @@ def save(
                             x
                         ), separator = '│', applyPadding = True
         )
-    logEvent_parseCSV = \
-        lambda x    : x.replace(',', '│')
+    logEvent_logObjectCreate = \
+        lambda name, info    : internalObject_initOrUpdate(name, info)
 
 
     d_logEvent:dict      = {
@@ -123,7 +127,7 @@ def save(
         '_timestamp'    : timestamp(),
         'appName'       : payload.appName,
         'execTime'      : payload.execTime,
-        'extra'         : payload.extra
+        'payload'       : payload.payload
     }
     d_ret:dict          = {
         'log'           : d_logEvent,
@@ -139,7 +143,9 @@ def save(
     str_logEventPath:str    = '%s/%s'   % (str_collectionDir, str_logEvent)
 
     if not payload.logObject in list_logObjects():
-        return d_ret
+        logSetup:logModel.logCore   = None
+        logSetup.description        = 'Automatically generated object'
+        logEvent_logObjectCreate(payload.logObject, logSetup)
 
     d_existingLog:dict      = {}
     if not logCollection_exists():
@@ -151,6 +157,34 @@ def save(
     d_ret['message'] = f"Saved log {str_logEventPath}"
     LOG(logEvent_getCSV(str_logEvent).replace('\n', ''))
     return d_ret
+
+def slog_save(
+    payload     : logModel.logSimple,
+    **kwargs
+) -> dict:
+    """Save an slog payload
+
+    Args:
+        payload (logModel.logSimple): a payload to log
+
+    Returns:
+        dict: the return verification object
+    """
+    object:str                              = 'default'
+    collection:str                          = 'default'
+    event:str                               = 'log'
+    for k,v in kwargs.items():
+        if k == 'object'                    : object        = v
+        if k == 'collection'                : collection    = v
+        if k == 'event'                     : event         = v
+    logStructured:logModel.logStructured    = logModel.logStructured()
+    logStructured.logObject                 = object
+    logStructured.logCollection             = collection
+    logStructured.appName                   = 'slog'
+    logStructured.execTime                  = -1.0
+    logStructured.logEvent                  = event
+    logStructured.payload                   = payload.log
+    return save(logStructured)
 
 def internalObject_initOrUpdate(
         logObj:str,
@@ -209,6 +243,20 @@ def internalObjectCollection_get(
     return config.dbAPI.telemetryService_collectionGet(
         objName, collectionName
     )
+
+def internalObjectCollection_delete(
+            objName:str,
+            collectionName:str
+) -> dict:
+    """
+    Delete all the collection <collectionName> in object <objName>
+    """
+    d_ret:dict = {
+        'status'    : config.dbAPI.telemetryService_collectionDel(
+                                objName, collectionName
+                    )
+    }
+    return d_ret
 
 def internalObjectCollection_getCSV(
             objName:str,
