@@ -245,26 +245,31 @@ logEvent_getAllAsCSV () {
 logEvent_getStats () {
   obj=$1
   collection=$2
-  RESP=$(curl -s -X 'GET' \
+  curl -s -X 'GET' \
     "$PFTEL/api/v1/log/$obj/$collection/stats?key=execTime" \
-    -H 'accept: application/json')
-  echo -n $RESP | tr -d '"'
+    -H 'accept: application/json' | jq
 }
 
 logCollection_getStats () {
   obj=$1
-  RESP=$(curl -s -X 'GET' \
-    "$PFTEL/api/v1/log/$obj/$collection/stats?key=execTime" \
-    -H 'accept: application/json')
-  echo -n $RESP | tr -d '"'
+  curl -s -X 'GET' \
+    "$PFTEL/api/v1/log/$obj/stats?key=execTime" \
+    -H 'accept: application/json' | jq
 }
 
 logCollection_getStatsProcess () {
   obj=$1
-  RESP=$(curl -s -X 'GET' \
-    "$PFTEL/api/v1/log/$obj/$collection/stats_process?key=execTime" \
-    -H 'accept: application/json')
-  echo -n $RESP | tr -d '"'
+  curl -s -X 'GET' \
+    "$PFTEL/api/v1/log/$obj/stats_process?key=execTime" \
+    -H 'accept: application/json' | jq
+}
+
+logEvents_delete () {
+  obj=$1
+  collection=$2
+  curl -s -X 'DELETE' \
+  "$PFTEL/api/v1/log/$obj/$collection/" \
+  -H 'accept: application/json'| jq
 }
 
 test_feedLog () {
