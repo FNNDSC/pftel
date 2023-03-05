@@ -44,10 +44,50 @@ async def logSetup_put(
     )
 
 @router.post(
+    '/slog/',
+    response_model  = logModel.logResponse,
+    summary         = '''
+    Use this API route to POST a simple log payload to the
+    logger.
+    '''
+)
+async def slog_write(
+    logPayload      : logModel.logSimple,
+    logObject       : str   = 'default',
+    logCollection   : str   = 'slog',
+    logEvent        : str   = 'log'
+) -> logModel.logResponse:
+    """
+    Description
+    -----------
+
+    Use this API entry point to simply record some log string.
+    `slog` entries are by default logged to `default/slog/<count>-log`
+    but this can be overriden with appropriate query parameters.
+
+    ```
+    {
+        log  : str   = ""
+    }
+    ```
+
+    Internally, they are mapped to a complete *telemetry* model for
+    consistent processing.
+
+    """
+    d_ret:logModel.logResponse = logController.slog_save(
+        logPayload,
+        object      = logObject,
+        collection  = logCollection,
+        event       = logEvent)
+    return d_ret
+
+
+@router.post(
     '/log/',
     response_model  = logModel.logResponse,
     summary         = '''
-    Use this API route to POST a freeform text payload to the
+    Use this API route to POST a telemetry conforming payload to the
     logger.
     '''
 )
@@ -57,12 +97,22 @@ async def log_write(
     """
     Description
     -----------
-    Use this API entry point to simply record some log string to some
-    backend resource.
 
-    The specific details of _how_ this resource exists is less relevant
-    to the client -- it could be a file/database/etc. In order to "read"
-    previous telemetry logs, perform a GET request.
+    Use this API entry-point to log a *telemetry* record called `{logEvent}`
+    to a given `{logObject}`/`{logCollection}`:
+
+    ```
+    {
+        logObject       : str   = "default"
+        logCollection   : str   = ""
+        logEvent        : str   = ""
+        appName         : str   = ""
+        execTime        : float = 0.0
+        payload         : str   = ""
+    }
+    ```
+
+    In order to "read" telemetry logs, perform an appropriate GET request.
 
     """
     # pudb.set_trace()
@@ -165,6 +215,29 @@ async def logEvent_getForObjectCollection(
         logObject,
         logCollection,
         logEvent
+    )
+
+
+@router.delete(
+    "/log/{logObject}/{logCollection}/",
+    response_model  = logModel.logDelete,
+    summary         = """
+    DELETE all the events comprising this log object.
+    """
+)
+async def log_getForObjectCollection(
+    logObject:str,
+    logCollection:str
+) -> bool:
+    """
+    Description
+    -----------
+    DELETE all the events in the collection `logCollection` of the object
+    `logObject`. Use with care!
+    """
+    return logController.internalObjectCollection_delete(
+        logObject,
+        logCollection
     )
 
 @router.get(
