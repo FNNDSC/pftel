@@ -366,10 +366,17 @@ class PFdb():
         str_use:str         = 'values'
         b_applyPadding:bool = False
         str_CSV:str         = ""
+        l_cols:list         = list(d_event.keys())
         for k,v in kwargs.items():
-            if k == 'separator'     :   str_separator   = v
-            if k == 'use'           :   str_use         = v
-            if k == 'applyPadding'  :   b_applyPadding  = v
+            if k == 'separator'         :   str_separator   = v
+            if k == 'use'               :   str_use         = v
+            if k == 'applyPadding'      :   b_applyPadding  = bool(v)
+            if k == 'show' and len(v)   :   l_cols          = v.split(',')
+        if len(l_cols):
+            try:
+                d_event = {key: d_event[key] for key in l_cols}
+            except:
+                pass
         lcsv_get            = \
             lambda doPadding, use   : \
                 self.telemetryService_padWidth(d_event, use = use)  if doPadding \
@@ -377,7 +384,7 @@ class PFdb():
                     else list(d_event.values())
 
         str_CSV += str_separator.join(str(x) for x in lcsv_get(b_applyPadding, str_use))
-        str_CSV += '\n'
+        # str_CSV += '\n'
         return str_CSV
 
     def telemetryService_collectionGetCSV(self,
@@ -388,27 +395,29 @@ class PFdb():
         Return a CSV formatted string of "event" data for the passed obj/collection
         """
         CSV_getStr      = \
-            lambda d, sep, field, padding : self.telemetryService_dictAsCSV(
-                d, separator = sep, use = field, applyPadding = padding
+            lambda d, fields, sep, field, padding : self.telemetryService_dictAsCSV(
+                d, show = fields, separator = sep, use = field, applyPadding = padding
             )
         table_topBorder = \
-            lambda d : self.telemetryService_dictAsCSV(
-                d, separator = '┬', use = 'flush', applyPadding = True
+            lambda d, fields : self.telemetryService_dictAsCSV(
+                d, show = fields, separator = '┬', use = 'flush', applyPadding = True
             )
         table_middleBorder = \
-            lambda d : self.telemetryService_dictAsCSV(
-                d, separator = '┼', use = 'flush', applyPadding = True
+            lambda d, fields : self.telemetryService_dictAsCSV(
+                d, show = fields, separator = '┼', use = 'flush', applyPadding = True
             )
         table_bottomBorder = \
-            lambda d : self.telemetryService_dictAsCSV(
-                d, separator = '┴', use = 'flush', applyPadding = True
+            lambda d, fields : self.telemetryService_dictAsCSV(
+                d, show = fields, separator = '┴', use = 'flush', applyPadding = True
             )
         str_format:str  = "plain"
         str_sep:str     = ','
+        str_fields:str  = ''
         b_padding:bool  = False
         for k,v in kwargs.items():
-            if k == 'format'        : str_format = v
-            if k == 'applyPadding'  : b_padding     = v
+            if k == 'format'        : str_format    = v
+            if k == 'applyPadding'  : b_padding     = bool(v)
+            if k == 'fields'        : str_fields    = v
         if str_format == 'fancy': str_sep = '│'
         str_CSV:str     = ""
         l_events:list   = [
@@ -420,13 +429,20 @@ class PFdb():
         ]
         if len(l_events):
             # Get the "headers"
-            if str_format == 'fancy': str_CSV += table_topBorder(l_events[0])
-            str_CSV += CSV_getStr(l_events[0], str_sep, 'keys', b_padding)
-            if str_format == 'fancy': str_CSV += table_middleBorder(l_events[0])
+            if str_format == 'fancy':
+                str_CSV += "┌" + table_topBorder(l_events[0], str_fields)                        + "┐\n"
+                str_CSV += '│' + CSV_getStr(l_events[0], str_fields, str_sep, 'keys', b_padding) + '│\n'
+                str_CSV += "├" + table_middleBorder(l_events[0], str_fields)                     + "┤\n"
+            else:
+                str_CSV += CSV_getStr(l_events[0], str_fields, str_sep, 'keys', b_padding) + '\n'
+
             # Now for the table body
             for el in l_events:
-                str_CSV += CSV_getStr(el, str_sep, 'values', b_padding)
-            if str_format == 'fancy': str_CSV += table_bottomBorder(l_events[0])
+                if str_format == 'fancy':
+                    str_CSV += '│' + CSV_getStr(el, str_fields, str_sep, 'values', b_padding) + '│\n'
+                else:
+                    str_CSV += CSV_getStr(el, str_fields, str_sep, 'values', b_padding) + '\n'
+            if str_format == 'fancy': str_CSV += "└" + table_bottomBorder(l_events[0], str_fields) + "┘\n"
         return str_CSV
 
     def telemetryService_collectionGetMatrix(self,
