@@ -5,7 +5,7 @@
 #
 # MAKE SURE ANY ENV VARIABLES SET BY THIS ARE WHAT YOU WANT!
 #
-#     * Feb-2023 -> 08-Jan-2022
+#     * Feb-2023
 #     Develop/deploy.
 #
 
@@ -81,30 +81,33 @@ randtime_generate () {
 
 ###############################################################################
 #_____________________________________________________________________________#
-# L O G G E R   s e t u p                                                     #
+# L O G   s i m p l e                                                         #
 #_____________________________________________________________________________#
 ###############################################################################
-# Setup write some telemetry to the DB from CLI.                              #
+# The "simplest" logging call uses the 'slog' API endpoint and contains a     #
+# a JSON body of {'log' : '<whatever'}                                        #
 ###############################################################################
 #
-# POPULATE DB WITH EVENTS
-#
-# Here we POST several events to the DB and then afterwards GET various
-# API elements.
-#
-# POST the events with
-#
-# $ mha-to-dcm <obj> <collection> <time>
-# $ inference <obj> <collection> <time>
-# $ measure <obj> <collection> <time>
-# $ push_to_PACS <obj> <collection> <time>
-#
-# GET information with
-#
-# $ logObj_list
-# $ logCollections_list <obj>
-# $ logEvents_list <obj> <collection>
-# $ logEvent_get <obj> <collection> <event>
+
+slog () {
+  log="$1"
+  curl -s -X 'POST' \
+  "$PFTEL/api/v1/slog/?logObject=default&logCollection=slog&logEvent=log" \
+  -H 'accept: application/json' \
+  -H 'Content-Type: application/json' \
+  -d '{
+  "log": "'"$log"'"
+  }' | jq
+}
+
+###############################################################################
+#_____________________________________________________________________________#
+# L O G G E R   i n i t                                                       #
+#_____________________________________________________________________________#
+###############################################################################
+# Create a top level logger. Note that if you log to  a collection for an     #
+# object that doesn't exit, the object is created automatically.              #
+###############################################################################
 #
 
 logObj_create () {
@@ -121,6 +124,36 @@ logObj_create () {
     "telemetryDir": "telemetry",
     "description": "A log object for testing"
   }' | jq
+}
+
+###############################################################################
+#_____________________________________________________________________________#
+# L O G G E R   p o p u l a t e                                               #
+#_____________________________________________________________________________#
+###############################################################################
+# Setup write some telemetry to the DB from CLI.                              #
+###############################################################################
+#
+# POPULATE DB WITH EVENTS
+#
+# Here we POST several events to the DB and then afterwards GET various
+# API elements.
+#
+# POST the events with
+#
+# $ mha-to-dcm <obj> <collection> <time>
+# $ inference <obj> <collection> <time>
+# $ measure <obj> <collection> <time>
+# $ push_to_PACS <obj> <collection> <time>
+
+test_feedLog () {
+  obj=$1
+  collection=$2
+  logObj_create   $obj
+  mha-to-dcm      $obj $collection $(randtime_generate 1000)
+  inference       $obj $collection $(randtime_generate 100000)
+  measure         $obj $collection $(randtime_generate 10000)
+  push_to_PACS    $obj $collection $(randtime_generate 10000)
 }
 
 mha-to-dcm () {
@@ -195,6 +228,61 @@ push_to_PACS () {
     }' | jq
 }
 
+###############################################################################
+#_____________________________________________________________________________#
+# L O G G E R   i n f o                                                       #
+#_____________________________________________________________________________#
+###############################################################################
+# Get telemetry information.                                                  #
+###############################################################################
+#
+# GET information with
+#
+pftel_help () {
+
+  cat << EOM
+
+$> test_feedLog <obj> <collection>
+   Create a "dummy" set of events in object <obj> and collection <collection>
+
+$> logObj_list
+   List all log "objects"
+
+$> logCollections_list <obj>
+   List all collections for <obj>
+
+$> logEvents_list <obj> <collection>
+   List all events in collection <collection> for object <obj>
+
+$> logEvent_get <obj> <collection> <event>
+   GET the <event> in collection <collection> for object <obj>
+
+$> logEvent_getAll <obj> <collection>
+   GET _all_ the events in collection <collection> for object <obj>
+
+$> logEvents_delete <obj> <collection>
+   DELETE _all_ the events in collection <collection> for object <obj>
+
+$> logEvent_getAllAsCSV <obj> <collection> <fields>
+   GET all the events in collection <collection> for object <obj> as a
+   CSV formatted string. Note the <fields> string can be passed as a
+   comma separate list of fields to retrieve.
+
+$> logEvent_getStats <obj> <collection>
+   GET a dictionary describing statistics across all events in the
+   specified <obj> <collection>
+
+$> logCollection_getStats <obj>
+   GET a list of dictionaries describing statistics across all <collections>
+   in <obj>
+
+$> logCollection_getStatsProcess <obj>
+   Process the entire space of <collections> in <obj> and return a dictionary
+   of cumulative statistics.
+
+EOM
+}
+
 logObj_list () {
   curl -s -X 'GET' \
     "$PFTEL/api/v1/log/" \
@@ -236,8 +324,9 @@ logEvent_getAll () {
 logEvent_getAllAsCSV () {
   obj=$1
   collection=$2
+  fields=$3
   RESP=$(curl -s -X 'GET' \
-    "$PFTEL/api/v1/log/$obj/$collection/csv?style=fancy&padding=true" \
+    "$PFTEL/api/v1/log/$obj/$collection/csv?style=fancy&padding=true&fields=$3" \
     -H 'accept: application/json')
   echo -n $RESP | tr -d '"'
 }
@@ -270,16 +359,6 @@ logEvents_delete () {
   curl -s -X 'DELETE' \
   "$PFTEL/api/v1/log/$obj/$collection/" \
   -H 'accept: application/json'| jq
-}
-
-test_feedLog () {
-  obj=$1
-  collection=$2
-  logObj_create   $obj
-  mha-to-dcm      $obj $collection $(randtime_generate 1000)
-  inference       $obj $collection $(randtime_generate 100000)
-  measure         $obj $collection $(randtime_generate 10000)
-  push_to_PACS    $obj $collection $(randtime_generate 10000)
 }
 
 #
