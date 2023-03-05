@@ -8,7 +8,7 @@ from    pfmisc.C_snode  import C_stree
 from    models          import logModel
 import  config
 import  sys
-
+import  shutil
 import  pudb
 
 class DBstate(S):
@@ -198,6 +198,7 @@ class PFdb():
             self.DB                     = T_onDisk
 
     def telemetryService_listObjs(self)-> list:
+        self.DB.cd(DBstate.DB)
         return list(self.DB.lstr_lsnode(DBstate.DB))
 
     def telemetryService_info(self, str_objName) -> dict:
@@ -268,6 +269,22 @@ class PFdb():
                         )
         ]
         return l_ret
+
+    def telemetryService_collectionDel(self,
+                str_objName,
+                str_collectionName) -> bool:
+        """
+        Delete the passed obj/collection from both internal memory
+        and storage
+        """
+        self.DB.cd('/')
+        b_ret:bool = self.DB.rm('%s/%s/%s' % (
+            DBstate.DB, str_objName, str_collectionName
+        ))
+        shutil.rmtree('%s/%s/%s/%s' % \
+                      (PFdb.str_FSprefix, DBstate.DB, str_objName, str_collectionName),
+                      ignore_errors = True)
+        return b_ret
 
     def telemetryService_padWidth(self,
                 d_event:dict,
