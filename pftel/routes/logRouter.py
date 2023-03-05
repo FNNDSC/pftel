@@ -11,7 +11,7 @@ str_description = """
 """
 
 
-from    fastapi             import  APIRouter, Query, HTTPException, BackgroundTasks
+from    fastapi             import  APIRouter, Query, HTTPException, BackgroundTasks, Request
 from    fastapi.encoders    import  jsonable_encoder
 from    typing              import  List, Dict
 
@@ -53,6 +53,7 @@ async def logSetup_put(
 )
 async def slog_write(
     logPayload      : logModel.logSimple,
+    request         : Request,
     logObject       : str   = 'default',
     logCollection   : str   = 'slog',
     logEvent        : str   = 'log'
@@ -75,8 +76,10 @@ async def slog_write(
     consistent processing.
 
     """
+    # pudb.set_trace()
     d_ret:logModel.logResponse = logController.slog_save(
         logPayload,
+        request,
         object      = logObject,
         collection  = logCollection,
         event       = logEvent)
@@ -92,7 +95,8 @@ async def slog_write(
     '''
 )
 async def log_write(
-    logPayload      : logModel.logStructured
+    logPayload      : logModel.logStructured,
+    request         : Request
 ) -> logModel.logResponse:
     """
     Description
@@ -116,7 +120,7 @@ async def log_write(
 
     """
     # pudb.set_trace()
-    d_ret:logModel.logResponse = logController.save(logPayload)
+    d_ret:logModel.logResponse = logController.save(logPayload, request)
     return d_ret
 
 @router.get(
@@ -275,7 +279,8 @@ async def log_getForObjectCollectionAsCSV(
     logObject:str,
     logCollection:str,
     style:str       = 'plain',
-    padding:bool    = False
+    padding:bool    = False,
+    fields:str      = ''
 ) -> str:
     """
     Description
@@ -284,13 +289,16 @@ async def log_getForObjectCollectionAsCSV(
     `logObject` as a CSV formatted string.
 
     By passing a URL query as `style=fancy` a _fancy_ CSV payload is
-    returned.
+    returned. Passing a comma-separated string of `fields=<strlist>`
+    will only return the `strlist` tokens in the CSV.
     """
+    # pudb.set_trace()
     return logController.internalObjectCollection_getCSV(
         logObject,
         logCollection,
         format          = style,
-        applyPadding    = padding
+        applyPadding    = padding,
+        fields          = fields
     )
 
 @router.get(
