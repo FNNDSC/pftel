@@ -28,8 +28,7 @@ class logFile(BaseModel):
 
 class logSimple(BaseModel):
     """The simplest log model POST"""
-    prefix                              : str   = ""
-    message                             : str   = ""
+    log                                 : str   = ""
 
 class logStructured(BaseModel):
     """A simple structured log model"""
@@ -38,22 +37,24 @@ class logStructured(BaseModel):
     logEvent                            : str   = ""
     appName                             : str   = ""
     execTime                            : float = 0.0
-    extra                               : str   = ""
+    payload                             : str   = ""
 
 class logPadding(Enum):
     _id                                 : int   = 5
     _timestamp                          : int   = 26
     appName                             : int   = 20
     execTime                            : int   = 10
-    extra                               : int   = 40
+    payload                             : int   = 60
 
 class logFormatting(Enum):
     _id                                 : str   = "int"
     _timestamp                          : str   = "str"
     appName                             : str   = "str"
     execTime                            : str   = "float"
-    extra                               : str   = "str"
+    payload                             : str   = "str"
 
+class logDelete(BaseModel):
+    status                              : bool  = False
 
 class logBoolReturn(BaseModel):
     status                              : bool  = False
