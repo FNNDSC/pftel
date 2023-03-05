@@ -29,10 +29,19 @@ tags_metadata:list = [
         "name"          :   "Logger services",
         "description"   :
             """
-            Provide API POST/GET endpoints that will log payloads of various
+            Provide API POST/GET/DELETE endpoints that will log payloads of various
             types from clients. This service is geared to provide a convenience
             aggregator for logging events from a group of related processes
             all providing telemetry on some compute operation.
+
+            Logs are organized by default in a two-level "directory" hierarchy: the top
+            level is called the `logObject` and the next level is the `logCollection`.
+            Within each `logCollection` are `events`.
+
+            For example, a `logObject` could be the name of a ChRIS feed type ('dylld')
+            while a `logCollection` could be the name of a single execution of that
+            Feed ('run1'). Within 'run1' are the logging data from each plugin in that
+            feed as it executed in that run.
             """
     },
     {
