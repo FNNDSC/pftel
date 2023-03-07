@@ -76,5 +76,5 @@ jobs:
         with:
           destination_container_repo: fnndsc/pfdcm
           provider: dockerhub
-          short_description: 'REST-API provider for ChRIS -> PACS'
+          short_description: 'REST-API telemtry server -- useful for ChRIS workflows'
           readme_file: 'README.md'
