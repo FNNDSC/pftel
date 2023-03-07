@@ -147,7 +147,7 @@ def save(
     str_logEventPath:str    = '%s/%s'   % (str_collectionDir, str_logEvent)
 
     if not payload.logObject in list_logObjects():
-        logSetup:logModel.logCore   = None
+        logSetup:logModel.logCore   = logModel.logCore()
         logSetup.description        = 'Automatically generated object'
         logEvent_logObjectCreate(payload.logObject, logSetup)
 
