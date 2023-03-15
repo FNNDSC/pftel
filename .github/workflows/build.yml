@@ -74,7 +74,7 @@ jobs:
           DOCKER_USER: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKER_PASS: ${{ secrets.DOCKERHUB_PASSWORD }}
         with:
-          destination_container_repo: fnndsc/pfdcm
+          destination_container_repo: fnndsc/pftel
           provider: dockerhub
           short_description: 'REST-API telemtry server -- useful for ChRIS workflows'
           readme_file: 'README.md'
